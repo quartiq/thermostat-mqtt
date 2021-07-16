@@ -40,7 +40,7 @@ heapless = "0.5"
 
 cortex-m-rtic = "0.5.6"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
-stm32-eth = { path = "../stm32-eth", features = ["stm32f407"] }
+stm32-eth = { path = "../stm32-eth", features = ["smoltcp-phy", "stm32f407"] }
 # stm32-eth = { version = "0.2.0", features = ["stm32f429"] }
 
 # rtt-target bump

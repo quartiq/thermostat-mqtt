@@ -37,6 +37,7 @@ const PERIOD: u32 = 1<<25;
 
 
 type Eth = stm32_eth::Eth<'static, 'static>;
+
 const SRC_MAC: [u8; 6] = [0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF];
 
 
@@ -113,6 +114,7 @@ impl NetStorage {
         }
     }
 }
+
 
 
 
@@ -210,30 +212,83 @@ const APP: () = {
         info!("Setup TCP/IP");
         let local_addr = Ipv4Address::new(10, 0, 0, 1);
         let ip_addr = IpCidr::new(IpAddress::from(local_addr), 24);
-        let (ip_addrs, neighbor_storage) = {
+        let ip_addrs = {
             static mut IP_ADDRS: Option<[IpCidr; 1]> = None;
-            // TODO: Doesn't need outer Option
-            static mut NEIGHBOR_STORAGE: Option<[Option<(IpAddress, Neighbor)>; 16]> = None;
             unsafe {
                 IP_ADDRS = Some([ip_addr]);
-                NEIGHBOR_STORAGE = Some([None; 16]);
-                (IP_ADDRS.as_mut().unwrap(), NEIGHBOR_STORAGE.as_mut().unwrap())
+                IP_ADDRS.as_mut().unwrap()
             }
         };
 
-        // let mut routes = Routes::new(&mut store.routes_cache[..]);
-        // routes
-        //     .add_default_ipv4_route(Ipv4Address::UNSPECIFIED)
-        //     .unwrap();
+        let store =
+            cortex_m::singleton!(: NetStorage = NetStorage::new()).unwrap();
 
-        let neighbor_cache = NeighborCache::new(&mut neighbor_storage[..]);
+
+        let neighbor_cache =
+            smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);
+
+
+        let mut routes = Routes::new(&mut store.routes_cache[..]);
+        routes
+            .add_default_ipv4_route(Ipv4Address::UNSPECIFIED)
+            .unwrap();
+
         let ethernet_addr = EthernetAddress(SRC_MAC);
-        let eth_iface = InterfaceBuilder::new(eth)
+        let interface = InterfaceBuilder::new(eth)
             .ethernet_addr(ethernet_addr)
             .ip_addrs(&mut ip_addrs[..])
             .neighbor_cache(neighbor_cache)
+            .routes(routes)
             .finalize();
 
+
+        let sockets = {
+            let mut sockets =
+                smoltcp::socket::SocketSet::new(&mut store.sockets[..]);
+
+            for storage in store.tcp_socket_storage[..].iter_mut() {
+                let tcp_socket = {
+                    let rx_buffer = smoltcp::socket::TcpSocketBuffer::new(
+                        &mut storage.rx_storage[..],
+                    );
+                    let tx_buffer = smoltcp::socket::TcpSocketBuffer::new(
+                        &mut storage.tx_storage[..],
+                    );
+
+                    smoltcp::socket::TcpSocket::new(rx_buffer, tx_buffer)
+                };
+                sockets.add(tcp_socket);
+            }
+
+            for storage in store.udp_socket_storage[..].iter_mut() {
+                let udp_socket = {
+                    let rx_buffer = smoltcp::socket::UdpSocketBuffer::new(
+                        &mut storage.rx_metadata[..],
+                        &mut storage.rx_storage[..],
+                    );
+                    let tx_buffer = smoltcp::socket::UdpSocketBuffer::new(
+                        &mut storage.tx_metadata[..],
+                        &mut storage.tx_storage[..],
+                    );
+
+                    smoltcp::socket::UdpSocket::new(rx_buffer, tx_buffer)
+                };
+                sockets.add(udp_socket);
+            }
+
+            sockets.add(smoltcp::socket::Dhcpv4Socket::new());
+
+            sockets
+        };
+
+        let mut stack = smoltcp_nal::NetworkStack::new(interface, sockets);
+
+        //
+        // NetworkDevices {
+        //     stack,
+        //     phy: lan8742a,
+        //     mac_address: mac_addr,
+        // }
 
         let mut leds = Leds::new(gpiod.pd9, gpiod.pd10.into_push_pull_output(), gpiod.pd11.into_push_pull_output());
 

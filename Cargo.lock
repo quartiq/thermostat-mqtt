@@ -475,6 +475,7 @@ version = "0.2.0"
 dependencies = [
  "aligned",
  "cortex-m 0.6.7",
+ "smoltcp",
  "stm32f4xx-hal",
  "volatile-register",
 ]
