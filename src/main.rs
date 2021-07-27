@@ -11,12 +11,21 @@ use crate::{
 };
 
 mod leds;
-// mod shared;
-// mod mod;
+mod cycle_counter;
+// mod network_users;
+// use network_users::NetworkUsers;
 
 mod setup;
 
+use stm32_eth;
+
+use stm32_eth::{
+    stm32::{Peripherals},
+};
+
 use rtic::cyccnt::{Instant, U32Ext as _};
+
+use smoltcp_nal::smoltcp;
 
 const PERIOD: u32 = 1<<25;
 
@@ -26,6 +35,7 @@ const APP: () = {
 
     struct Resources {
         leds: Leds,
+        network: setup::NetworkDevices,
     }
 
     #[init(schedule = [blink])]
@@ -33,13 +43,33 @@ const APP: () = {
 
         let (mut leds, mut network_devices) = setup::setup(c.core, c.device);
 
+
+        // let mut network = NetworkUsers::new(
+        //     network_devices.stack,
+        //     env!("CARGO_BIN_NAME"),
+        //     network_devices.mac_address,
+        // );
+
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
 
-
         init::LateResources {
-            leds: leds
+            leds: leds,
+            network: network_devices,
         }
     }
+
+    // #[idle(resources=[network])]
+    // fn idle(mut c: idle::Context) -> ! {
+    //     loop {
+    //         match c.resources.network.lock(|net| net.update()) {
+    //             NetworkState::SettingsChanged => {
+    //                 //c.spawn.settings_update().unwrap()
+    //             }
+    //             NetworkState::Updated => {}
+    //             NetworkState::NoChange => cortex_m::asm::wfi(),
+    //         }
+    //     }
+    // }
 
     #[task(resources = [leds], schedule = [blink])]
     fn blink(c: blink::Context) {
@@ -56,6 +86,12 @@ const APP: () = {
         }
         c.schedule.blink(c.scheduled + PERIOD.cycles()).unwrap();
 
+    }
+
+    #[task(binds = ETH, priority = 1)]
+    fn eth(_: eth::Context) {
+        let p = unsafe { Peripherals::steal() };
+        stm32_eth::eth_interrupt_handler(&p.ETHERNET_DMA);
     }
 
     extern "C" {

@@ -6,12 +6,10 @@ use crate::{
     leds::Leds,
 };
 
-// mod leds;
-
 
 use smoltcp_nal::smoltcp;
 use smoltcp_nal::smoltcp::{
-    iface::{InterfaceBuilder, Neighbor, NeighborCache, Routes},
+    iface::{InterfaceBuilder, Neighbor, NeighborCache, Routes, Interface},
     socket::{SocketHandle, SocketSetItem, TcpSocket, TcpSocketBuffer},
     // time::Instant,
     wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address},
@@ -33,6 +31,8 @@ const HSE: MegaHertz = MegaHertz(8);
 
 use rtic::cyccnt::{Instant, U32Ext as _};
 
+
+use crate::cycle_counter::CycleCounter;
 
 type Eth = stm32_eth::Eth<'static, 'static>;
 
@@ -143,6 +143,7 @@ pub fn setup(
     });
     dp.RCC.ahb1enr.modify(|_, w| w.dma1en().enabled());
 
+
     let clocks = dp.RCC.constrain()
         .cfgr
         .use_hse(HSE)
@@ -205,8 +206,8 @@ pub fn setup(
         }
     };
 
-    // info!("Enabling ethernet interrupt");
-    //eth.enable_interrupt();
+    info!("Enabling ethernet interrupt");
+    eth.enable_interrupt();
 
 
     let store =
@@ -278,6 +279,7 @@ pub fn setup(
         stack,
         mac_address: ethernet_addr,
     };
+
 
 
     // loop {cortex_m::asm::nop();}
