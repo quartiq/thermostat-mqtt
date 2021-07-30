@@ -32,11 +32,11 @@ const HSE: MegaHertz = MegaHertz(8);
 use rtic::cyccnt::{Instant, U32Ext as _};
 
 
-use crate::cycle_counter::CycleCounter;
-
 type Eth = stm32_eth::Eth<'static, 'static>;
 
-const SRC_MAC: [u8; 6] = [0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF];
+// const SRC_MAC: [u8; 6] = [0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF];
+const SRC_MAC: [u8; 6] = [0xF6, 0x48, 0x74, 0xC8, 0xC4, 0x83];
+
 
 
 const NUM_TCP_SOCKETS: usize = 4;
@@ -101,8 +101,7 @@ impl TcpSocketStorage {
 impl Default for NetStorage {
     fn default() -> Self {
         NetStorage {
-            ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(10, 0, 0, 1)), 24)],
-
+            ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(192, 168, 1, 50)), 24)],
             neighbor_cache: [None; 8],
             routes_cache: [None; 8],
             sockets: [None, None, None, None, None],

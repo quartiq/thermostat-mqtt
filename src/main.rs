@@ -11,7 +11,6 @@ use crate::{
 };
 
 mod leds;
-mod cycle_counter;
 // mod network_users;
 // use network_users::NetworkUsers;
 
@@ -27,7 +26,16 @@ use rtic::cyccnt::{Instant, U32Ext as _};
 
 use smoltcp_nal::smoltcp;
 
+// pub mod messages;
+// pub mod miniconf_client;
+// pub mod shared;
+// pub mod configuration;
+//
+// pub use miniconf;
+
 const PERIOD: u32 = 1<<25;
+
+
 
 
 #[rtic::app(device = stm32_eth::stm32, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
@@ -52,24 +60,31 @@ const APP: () = {
 
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
 
+
         init::LateResources {
             leds: leds,
             network: network_devices,
         }
     }
 
-    // #[idle(resources=[network])]
-    // fn idle(mut c: idle::Context) -> ! {
-    //     loop {
-    //         match c.resources.network.lock(|net| net.update()) {
-    //             NetworkState::SettingsChanged => {
-    //                 //c.spawn.settings_update().unwrap()
-    //             }
-    //             NetworkState::Updated => {}
-    //             NetworkState::NoChange => cortex_m::asm::wfi(),
-    //         }
-    //     }
-    // }
+    #[idle(resources=[network])]
+    fn idle(mut c: idle::Context) -> ! {
+
+        let start = Instant::now();
+        loop {
+            let now: u32 = start.elapsed().as_cycles()/168000;
+            let updated = c.resources.network.stack.poll(now);
+            log::info!("{:?}", updated);
+            log::info!("{:?}", now);
+            // match c.resources.network.lock(|net| net.update()) {
+            //     NetworkState::SettingsChanged => {
+            //         //c.spawn.settings_update().unwrap()
+            //     }
+            //     NetworkState::Updated => {}
+            //     NetworkState::NoChange => cortex_m::asm::wfi(),
+            // }
+        }
+    }
 
     #[task(resources = [leds], schedule = [blink])]
     fn blink(c: blink::Context) {

@@ -37,6 +37,9 @@ cortex-m-log = { version = "0.6", features = ["log-integration"] }
 heapless = "0.5"
 # serde-json-core = "0.1"
 # sfkv = "0.1"
+serde = { version = "1.0", features = ["derive"], default-features = false }
+miniconf = "0.1.0"
+
 
 cortex-m-rtic = "0.5.6"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
@@ -52,6 +55,13 @@ rev = "70b0eb5"
 git = "https://github.com/quartiq/smoltcp-nal.git"
 rev = "5baf55f"
 
+[patch.crates-io.miniconf]
+git = "https://github.com/quartiq/miniconf.git"
+rev = "9c826f8"
+
+[dependencies.minimq]
+git = "https://github.com/quartiq/minimq.git"
+rev = "93813e3"
 
 # [features]
 # semihosting = ["panic-semihosting", "cortex-m-log/semihosting"]
