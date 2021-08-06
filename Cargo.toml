@@ -16,7 +16,7 @@ default-target = "thumbv7em-none-eabihf"
 [dependencies]
 panic-halt = "0.2"
 # panic-semihosting = { version = "0.5", optional = true }
-log = "0.4"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 bare-metal = "1"
 cortex-m = "0.7"
 cortex-m-rt = { version = "0.6", features = ["device"] }
@@ -43,8 +43,8 @@ miniconf = "0.1.0"
 
 cortex-m-rtic = "0.5.6"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
-stm32-eth = { path = "../stm32-eth", features = ["smoltcp-phy", "stm32f407"] }
-# stm32-eth = { version = "0.2.0", features = ["stm32f429"] }
+stm32-eth = { path = "../stm32-eth", features = ["smoltcp-phy", "stm32f427"] }
+# stm32-eth = { version = "0.2.0", features = ["stm32f427"] }
 
 # rtt-target bump
 [dependencies.rtt-logger]
@@ -62,6 +62,16 @@ rev = "9c826f8"
 [dependencies.minimq]
 git = "https://github.com/quartiq/minimq.git"
 rev = "93813e3"
+
+[patch.crates-io.smoltcp]
+git = "https://github.com/smoltcp-rs/smoltcp"
+# branch = "master"
+rev = "1134eb"
+
+[patch.crates-io.stm32f4xx-hal]
+git = "https://github.com/astro/stm32f4xx-hal.git"
+branch = "flash"
+
 
 # [features]
 # semihosting = ["panic-semihosting", "cortex-m-log/semihosting"]

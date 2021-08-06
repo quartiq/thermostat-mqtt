@@ -567,6 +567,7 @@ source = "git+https://github.com/smoltcp-rs/smoltcp?branch=master#1134eb28d8c688
 dependencies = [
  "bitflags",
  "byteorder",
+ "log",
  "managed",
 ]
 
@@ -682,3 +683,8 @@ checksum = "0d67cb4616d99b940db1d6bd28844ff97108b498a6ca850e5b6191a532063286"
 dependencies = [
  "vcell",
 ]
+
+[[patch.unused]]
+name = "smoltcp"
+version = "0.8.0"
+source = "git+https://github.com/smoltcp-rs/smoltcp?rev=1134eb#1134eb28d8c6886034f6ccad452101dc5e6d679c"

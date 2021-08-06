@@ -46,7 +46,7 @@ const APP: () = {
         network: setup::NetworkDevices,
     }
 
-    #[init(schedule = [blink])]
+    #[init(schedule = [blink, poll_eth])]
     fn init(c: init::Context) -> init::LateResources {
 
         let (mut leds, mut network_devices) = setup::setup(c.core, c.device);
@@ -58,7 +58,9 @@ const APP: () = {
         //     network_devices.mac_address,
         // );
 
+        log::info!("setup done");
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
+        c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
 
 
         init::LateResources {
@@ -67,24 +69,35 @@ const APP: () = {
         }
     }
 
-    #[idle(resources=[network])]
-    fn idle(mut c: idle::Context) -> ! {
+    // #[idle(resources=[network])]
+    // fn idle(mut c: idle::Context) -> ! {
+    //
+    //     let start = Instant::now();
+    //     loop {
+    //         let now: u32 = start.elapsed().as_cycles()/168000;
+    //         let updated = c.resources.network.stack.poll(now);
+    //         log::info!("{:?}", updated);
+    //         log::info!("{:?}", now);
+    //         // match c.resources.network.lock(|net| net.update()) {
+    //         //     NetworkState::SettingsChanged => {
+    //         //         //c.spawn.settings_update().unwrap()
+    //         //     }
+    //         //     NetworkState::Updated => {}
+    //         //     NetworkState::NoChange => cortex_m::asm::wfi(),
+    //         // }
+    //     }
+    // }
 
-        let start = Instant::now();
-        loop {
-            let now: u32 = start.elapsed().as_cycles()/168000;
-            let updated = c.resources.network.stack.poll(now);
-            log::info!("{:?}", updated);
-            log::info!("{:?}", now);
-            // match c.resources.network.lock(|net| net.update()) {
-            //     NetworkState::SettingsChanged => {
-            //         //c.spawn.settings_update().unwrap()
-            //     }
-            //     NetworkState::Updated => {}
-            //     NetworkState::NoChange => cortex_m::asm::wfi(),
-            // }
-        }
+    #[task(resources = [network], schedule = [poll_eth])]
+    fn poll_eth(c: poll_eth::Context) {
+        static mut NOW: u32 = 0;
+        let updated = c.resources.network.stack.poll(*NOW);
+        log::info!("{:?}", *NOW);
+        log::info!("{:?}", updated);
+        *NOW = *NOW + 1;
+        c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
     }
+
 
     #[task(resources = [leds], schedule = [blink])]
     fn blink(c: blink::Context) {

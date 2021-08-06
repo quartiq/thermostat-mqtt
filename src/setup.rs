@@ -19,6 +19,7 @@ use stm32_eth::{
     {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
     hal::gpio::GpioExt,
     hal::rcc::RccExt,
+    hal::delay::Delay,
     hal::time::{U32Ext, MegaHertz},
     stm32::{Interrupt, CorePeripherals, Peripherals, SYST},
 };
@@ -35,9 +36,8 @@ use rtic::cyccnt::{Instant, U32Ext as _};
 type Eth = stm32_eth::Eth<'static, 'static>;
 
 // const SRC_MAC: [u8; 6] = [0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF];
-const SRC_MAC: [u8; 6] = [0xF6, 0x48, 0x74, 0xC8, 0xC4, 0x83];
-
-
+// const SRC_MAC: [u8; 6] = [0xF6, 0x48, 0x74, 0xC8, 0xC4, 0x83];
+const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1a];  // eeprom
 
 const NUM_TCP_SOCKETS: usize = 4;
 const NUM_UDP_SOCKETS: usize = 1;
@@ -52,15 +52,15 @@ pub struct NetStorage {
     pub tcp_socket_storage: [TcpSocketStorage; NUM_TCP_SOCKETS],
     pub udp_socket_storage: [UdpSocketStorage; NUM_UDP_SOCKETS],
     pub neighbor_cache:
-        [Option<(smoltcp::wire::IpAddress, smoltcp::iface::Neighbor)>; 8],
+        [Option<(smoltcp::wire::IpAddress, smoltcp::iface::Neighbor)>; 4],
     pub routes_cache:
-        [Option<(smoltcp::wire::IpCidr, smoltcp::iface::Route)>; 8],
+        [Option<(smoltcp::wire::IpCidr, smoltcp::iface::Route)>; 4],
 
 }
 
 pub struct UdpSocketStorage {
-    rx_storage: [u8; 256],
-    tx_storage: [u8; 256],
+    rx_storage: [u8; 128],
+    tx_storage: [u8; 128],
     tx_metadata:
         [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 10],
     rx_metadata:
@@ -70,8 +70,8 @@ pub struct UdpSocketStorage {
 impl UdpSocketStorage {
     const fn new() -> Self {
         Self {
-            rx_storage: [0; 256],
-            tx_storage: [0; 256],
+            rx_storage: [0; 128],
+            tx_storage: [0; 128],
             tx_metadata: [smoltcp::storage::PacketMetadata::<
                 smoltcp::wire::IpEndpoint,
             >::EMPTY; 10],
@@ -84,15 +84,15 @@ impl UdpSocketStorage {
 
 #[derive(Copy, Clone)]
 pub struct TcpSocketStorage {
-    rx_storage: [u8; 256],
-    tx_storage: [u8; 256],
+    rx_storage: [u8; 128],
+    tx_storage: [u8; 128],
 }
 
 impl TcpSocketStorage {
     const fn new() -> Self {
         Self {
-            rx_storage: [0; 256],
-            tx_storage: [0; 256],
+            rx_storage: [0; 128],
+            tx_storage: [0; 128],
         }
     }
 }
@@ -102,8 +102,8 @@ impl Default for NetStorage {
     fn default() -> Self {
         NetStorage {
             ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(192, 168, 1, 50)), 24)],
-            neighbor_cache: [None; 8],
-            routes_cache: [None; 8],
+            neighbor_cache: [None; 4],
+            routes_cache: [None; 4],
             sockets: [None, None, None, None, None],
             tcp_socket_storage: [TcpSocketStorage::new(); NUM_TCP_SOCKETS],
             udp_socket_storage: [UdpSocketStorage::new(); NUM_UDP_SOCKETS],
@@ -129,7 +129,7 @@ pub fn setup(
 
     let mut cp = core;
     cp.SCB.enable_icache();
-    cp.SCB.enable_dcache(&mut cp.CPUID);
+    // cp.SCB.enable_dcache(&mut cp.CPUID);
     cp.DCB.enable_trace();
     cp.DWT.enable_cycle_counter();
 
@@ -154,18 +154,34 @@ pub fn setup(
 
 
     // setup Logger
-    static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Info);
+    static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
     rtt_target::rtt_init_print!();
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
-    log::info!("Starting");
+    log::trace!("Starting");
 
     // take gpios
     let gpioa = dp.GPIOA.split();
     let gpiob = dp.GPIOB.split();
     let gpioc = dp.GPIOC.split();
     let gpiod = dp.GPIOD.split();
+
+    log::trace!("waiting a bit");
+
+    let mut leds = Leds::new(gpiod.pd9, gpiod.pd10.into_push_pull_output(), gpiod.pd11.into_push_pull_output());
+
+    for _ in 0..100000{
+        leds.g3.on();
+        leds.g3.off();
+    }
+
+    leds.r1.on();
+    leds.g3.on();
+    leds.g4.off();
+    log::trace!("waited a bit");
+
+
 
     // Setup ethernet.
     info!("Setup ethernet");
@@ -184,7 +200,7 @@ pub fn setup(
 
     let eth = {
         static mut RX_RING: Option<[RingEntry<RxDescriptor>; 4]> = None;
-        static mut TX_RING: Option<[RingEntry<TxDescriptor>; 2]> = None;
+        static mut TX_RING: Option<[RingEntry<TxDescriptor>; 4]> = None;
         static mut ETH: Option<Eth> = None;
         unsafe {
             RX_RING = Some(Default::default());
@@ -216,9 +232,14 @@ pub fn setup(
     let neighbor_cache =
         smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);
 
+    // let i = match store.ip_addrs[0].address() {
+    //     IpAddress::Ipv4(addr) => addr,
+    //     _ => unreachable!(),
+    // };
 
     let mut routes = Routes::new(&mut store.routes_cache[..]);
     routes
+        // .add_default_ipv4_route(i)
         .add_default_ipv4_route(Ipv4Address::UNSPECIFIED)
         .unwrap();
 
@@ -283,11 +304,11 @@ pub fn setup(
 
     // loop {cortex_m::asm::nop();}
 
-    let mut leds = Leds::new(gpiod.pd9, gpiod.pd10.into_push_pull_output(), gpiod.pd11.into_push_pull_output());
-
-    leds.r1.on();
-    leds.g3.on();
-    leds.g4.off();
+    // let mut leds = Leds::new(gpiod.pd9, gpiod.pd10.into_push_pull_output(), gpiod.pd11.into_push_pull_output());
+    //
+    // leds.r1.on();
+    // leds.g3.on();
+    // leds.g4.off();
 
 
     (leds, network_devices)
