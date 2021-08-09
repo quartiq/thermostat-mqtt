@@ -179,7 +179,7 @@ pub fn setup(
         md_clk: gpioc.pc1,
         crs: gpioa.pa7,
         tx_en: gpiob.pb11,
-        tx_d0: gpiob.pb12,
+        tx_d0: gpiog.pg13,
         tx_d1: gpiob.pb13,
         rx_d0: gpioc.pc4,
         rx_d1: gpioc.pc5,
