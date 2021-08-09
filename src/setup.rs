@@ -1,6 +1,6 @@
 
 //use panic_halt as _;
-use log::{error, info, warn};
+use log::info;
 
 use crate::{
     leds::Leds,
@@ -9,8 +9,8 @@ use crate::{
 
 use smoltcp_nal::smoltcp;
 use smoltcp_nal::smoltcp::{
-    iface::{InterfaceBuilder, Neighbor, NeighborCache, Routes, Interface},
-    socket::{SocketHandle, SocketSetItem, TcpSocket, TcpSocketBuffer},
+    iface::{InterfaceBuilder, Routes},
+    // socket::{SocketHandle, SocketSetItem, TcpSocket, TcpSocketBuffer},
     // time::Instant,
     wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address},
 };
@@ -19,19 +19,13 @@ use stm32_eth::{
     {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
     hal::gpio::GpioExt,
     hal::rcc::RccExt,
-    hal::delay::Delay,
-    hal::time::{U32Ext, MegaHertz},
-    stm32::{Interrupt, CorePeripherals, Peripherals, SYST},
+    hal::time::U32Ext,
+    // stm32::{Interrupt, CorePeripherals, Peripherals, SYST},
 };
-
 
 use rtt_logger::RTTLogger;
 
-const HSE: MegaHertz = MegaHertz(8);
-
-
-use rtic::cyccnt::{Instant, U32Ext as _};
-
+// use rtic::cyccnt::{Instant, U32Ext as _};
 
 type Eth = stm32_eth::Eth<'static, 'static>;
 
@@ -39,8 +33,8 @@ type Eth = stm32_eth::Eth<'static, 'static>;
 // const SRC_MAC: [u8; 6] = [0xF6, 0x48, 0x74, 0xC8, 0xC4, 0x83];
 const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1a];  // eeprom
 
-const NUM_TCP_SOCKETS: usize = 4;
-const NUM_UDP_SOCKETS: usize = 1;
+const NUM_TCP_SOCKETS: usize = 1;
+const NUM_UDP_SOCKETS: usize = 0;
 const NUM_SOCKETS: usize = NUM_UDP_SOCKETS + NUM_TCP_SOCKETS;
 
 pub struct NetStorage {
@@ -52,9 +46,9 @@ pub struct NetStorage {
     pub tcp_socket_storage: [TcpSocketStorage; NUM_TCP_SOCKETS],
     pub udp_socket_storage: [UdpSocketStorage; NUM_UDP_SOCKETS],
     pub neighbor_cache:
-        [Option<(smoltcp::wire::IpAddress, smoltcp::iface::Neighbor)>; 4],
+        [Option<(smoltcp::wire::IpAddress, smoltcp::iface::Neighbor)>; 8],
     pub routes_cache:
-        [Option<(smoltcp::wire::IpCidr, smoltcp::iface::Route)>; 4],
+        [Option<(smoltcp::wire::IpCidr, smoltcp::iface::Route)>; 1],
 
 }
 
@@ -62,9 +56,9 @@ pub struct UdpSocketStorage {
     rx_storage: [u8; 128],
     tx_storage: [u8; 128],
     tx_metadata:
-        [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 10],
+        [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 2],
     rx_metadata:
-        [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 10],
+        [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 2],
 }
 
 impl UdpSocketStorage {
@@ -74,10 +68,10 @@ impl UdpSocketStorage {
             tx_storage: [0; 128],
             tx_metadata: [smoltcp::storage::PacketMetadata::<
                 smoltcp::wire::IpEndpoint,
-            >::EMPTY; 10],
+            >::EMPTY; 2],
             rx_metadata: [smoltcp::storage::PacketMetadata::<
                 smoltcp::wire::IpEndpoint,
-            >::EMPTY; 10],
+            >::EMPTY; 2],
         }
     }
 }
@@ -101,10 +95,10 @@ impl TcpSocketStorage {
 impl Default for NetStorage {
     fn default() -> Self {
         NetStorage {
-            ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(192, 168, 1, 50)), 24)],
-            neighbor_cache: [None; 4],
-            routes_cache: [None; 4],
-            sockets: [None, None, None, None, None],
+            ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(192, 168, 1, 26)), 24)],
+            neighbor_cache: [None; 8],
+            routes_cache: [None; 1],
+            sockets: [None],
             tcp_socket_storage: [TcpSocketStorage::new(); NUM_TCP_SOCKETS],
             udp_socket_storage: [UdpSocketStorage::new(); NUM_UDP_SOCKETS],
         }
@@ -128,9 +122,9 @@ pub fn setup(
 ) -> (Leds, NetworkDevices) {
 
     let mut cp = core;
-    cp.SCB.enable_icache();
+    // cp.SCB.enable_icache();
     // cp.SCB.enable_dcache(&mut cp.CPUID);
-    cp.DCB.enable_trace();
+    // cp.DCB.enable_trace();
     cp.DWT.enable_cycle_counter();
 
     let dp = device;
@@ -142,16 +136,14 @@ pub fn setup(
     });
     dp.RCC.ahb1enr.modify(|_, w| w.dma1en().enabled());
 
-
     let clocks = dp.RCC.constrain()
         .cfgr
-        .use_hse(HSE)
+        .use_hse(8.mhz())
         .sysclk(168.mhz())
         .hclk(168.mhz())
         .pclk1(32.mhz())
         .pclk2(64.mhz())
         .freeze();
-
 
     // setup Logger
     static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
@@ -171,21 +163,13 @@ pub fn setup(
 
     let mut leds = Leds::new(gpiod.pd9, gpiod.pd10.into_push_pull_output(), gpiod.pd11.into_push_pull_output());
 
-    for _ in 0..100000{
-        leds.g3.on();
-        leds.g3.off();
-    }
-
     leds.r1.on();
-    leds.g3.on();
+    leds.g3.off();
     leds.g4.off();
+
     log::trace!("waited a bit");
 
-
-
     // Setup ethernet.
-    info!("Setup ethernet");
-
     let eth_pins = EthPins {
         ref_clk: gpioa.pa1,
         md_io: gpioa.pa2,
@@ -200,7 +184,7 @@ pub fn setup(
 
     let eth = {
         static mut RX_RING: Option<[RingEntry<RxDescriptor>; 4]> = None;
-        static mut TX_RING: Option<[RingEntry<TxDescriptor>; 4]> = None;
+        static mut TX_RING: Option<[RingEntry<TxDescriptor>; 2]> = None;
         static mut ETH: Option<Eth> = None;
         unsafe {
             RX_RING = Some(Default::default());
@@ -224,10 +208,8 @@ pub fn setup(
     info!("Enabling ethernet interrupt");
     eth.enable_interrupt();
 
-
     let store =
         cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
-
 
     let neighbor_cache =
         smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);

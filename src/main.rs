@@ -4,7 +4,6 @@
 
 
 use panic_halt as _;
-use log::{error, info, warn};
 
 use crate::{
     leds::Leds,
@@ -24,7 +23,7 @@ use stm32_eth::{
 
 use rtic::cyccnt::{Instant, U32Ext as _};
 
-use smoltcp_nal::smoltcp;
+// use smoltcp_nal::smoltcp;
 
 // pub mod messages;
 // pub mod miniconf_client;
@@ -34,9 +33,6 @@ use smoltcp_nal::smoltcp;
 // pub use miniconf;
 
 const PERIOD: u32 = 1<<25;
-
-
-
 
 #[rtic::app(device = stm32_eth::stm32, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
 const APP: () = {
@@ -59,8 +55,8 @@ const APP: () = {
         // );
 
         log::info!("setup done");
-        c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
-        c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
+        // c.schedule.blink(c.start).unwrap();
+        c.schedule.poll_eth(c.start).unwrap();
 
 
         init::LateResources {
@@ -91,13 +87,15 @@ const APP: () = {
     #[task(resources = [network], schedule = [poll_eth])]
     fn poll_eth(c: poll_eth::Context) {
         static mut NOW: u32 = 0;
-        let updated = c.resources.network.stack.poll(*NOW);
-        log::info!("{:?}", *NOW);
-        log::info!("{:?}", updated);
-        *NOW = *NOW + 1;
+        let now = *NOW;
+        match c.resources.network.stack.poll(now) {
+            Ok(true) => log::info!("updated, {}", now),
+            Err(x) => log::warn!("err {}", x),
+            _ => {}
+        };
+        *NOW = now.wrapping_add(1);
         c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
     }
-
 
     #[task(resources = [leds], schedule = [blink])]
     fn blink(c: blink::Context) {

@@ -1,5 +1,5 @@
 [target.thumbv7em-none-eabihf]
-runner = "probe-run --chip STM32F427 --speed 30000"
+runner = "probe-run --chip STM32F427ZITx --speed 30000"
 rustflags = [
   "-C", "link-arg=-Tlink.x",
 ]
