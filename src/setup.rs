@@ -158,6 +158,9 @@ pub fn setup(
     let gpiob = dp.GPIOB.split();
     let gpioc = dp.GPIOC.split();
     let gpiod = dp.GPIOD.split();
+    let gpioe = dp.GPIOE.split();
+    let gpiof = dp.GPIOF.split();
+    let gpiog = dp.GPIOG.split();
 
     log::trace!("waiting a bit");
 
@@ -182,27 +185,31 @@ pub fn setup(
         rx_d1: gpioc.pc5,
     };
 
+    let rx_ring = cortex_m::singleton!(: [RingEntry<RxDescriptor>; 4] = Default::default()).unwrap();
+    let tx_ring = cortex_m::singleton!(: [RingEntry<TxDescriptor>; 2] = Default::default()).unwrap();
+    let eth_opt = cortex_m::singleton!(: Option<Eth> = Default::default()).unwrap();
+
     let eth = {
-        static mut RX_RING: Option<[RingEntry<RxDescriptor>; 4]> = None;
-        static mut TX_RING: Option<[RingEntry<TxDescriptor>; 2]> = None;
-        static mut ETH: Option<Eth> = None;
-        unsafe {
-            RX_RING = Some(Default::default());
-            TX_RING = Some(Default::default());
-            info!("Creating ethernet");
-            let eth = Eth::new(
-                dp.ETHERNET_MAC,
-                dp.ETHERNET_DMA,
-                &mut RX_RING.as_mut().unwrap()[..],
-                &mut TX_RING.as_mut().unwrap()[..],
-                PhyAddress::_0,
-                clocks,
-                eth_pins,
-            ).unwrap();
-            info!("Created ethernet");
-            ETH = Some(eth);
-            ETH.as_mut().unwrap()
-        }
+        // static mut rx_ring: option<[ringentry<rxdescriptor>; 4]> = none;
+        // static mut tx_ring: option<[ringentry<txdescriptor>; 2]> = none;
+        // static mut ETH: Option<Eth> = None;
+        // RX_RING = Some(Default::default());
+        // TX_RING = Some(Default::default());
+        info!("Creating ethernet");
+        let eth = Eth::new(
+            dp.ETHERNET_MAC,
+            dp.ETHERNET_DMA,
+            // &mut RX_RING.as_mut().unwrap()[..],
+            // &mut TX_RING.as_mut().unwrap()[..],
+            &mut rx_ring[..],
+            &mut tx_ring[..],
+            PhyAddress::_0,
+            clocks,
+            eth_pins,
+        ).unwrap();
+        info!("Created ethernet");
+        eth_opt.replace(eth);
+        eth_opt.as_mut().unwrap()
     };
 
     info!("Enabling ethernet interrupt");
