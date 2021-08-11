@@ -51,13 +51,6 @@ const APP: () = {
 
         let (mut leds, mut network_devices) = setup::setup(c.core, c.device);
 
-
-        // let mut network = NetworkUsers::new(
-        //     network_devices.stack,
-        //     env!("CARGO_BIN_NAME"),
-        //     network_devices.mac_address,
-        // );
-
         log::info!("setup done");
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
         c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
@@ -69,24 +62,6 @@ const APP: () = {
         }
     }
 
-    // #[idle(resources=[network])]
-    // fn idle(mut c: idle::Context) -> ! {
-    //
-    //     let start = Instant::now();
-    //     loop {
-    //         let now: u32 = start.elapsed().as_cycles()/168000;
-    //         let updated = c.resources.network.stack.poll(now);
-    //         log::info!("{:?}", updated);
-    //         log::info!("{:?}", now);
-    //         // match c.resources.network.lock(|net| net.update()) {
-    //         //     NetworkState::SettingsChanged => {
-    //         //         //c.spawn.settings_update().unwrap()
-    //         //     }
-    //         //     NetworkState::Updated => {}
-    //         //     NetworkState::NoChange => cortex_m::asm::wfi(),
-    //         // }
-    //     }
-    // }
 
     #[task(resources = [network], schedule = [poll_eth])]
     fn poll_eth(c: poll_eth::Context) {
