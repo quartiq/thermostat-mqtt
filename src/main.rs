@@ -11,8 +11,8 @@ use crate::{
 };
 
 mod leds;
-// mod network_users;
-// use network_users::NetworkUsers;
+mod network_users;
+use network_users::NetworkUsers;
 
 mod setup;
 
@@ -28,12 +28,29 @@ use smoltcp_nal::smoltcp;
 
 // pub mod messages;
 // pub mod miniconf_client;
-// pub mod shared;
+pub mod shared;
 // pub mod configuration;
-//
-// pub use miniconf;
+
+pub use miniconf::Miniconf;
+pub use serde::Deserialize;
 
 const PERIOD: u32 = 1<<25;
+
+
+
+#[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
+pub struct Settings {
+    /// Configure the LED
+    led: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            led: false,
+        }
+    }
+}
 
 
 
@@ -43,7 +60,8 @@ const APP: () = {
 
     struct Resources {
         leds: Leds,
-        network: setup::NetworkDevices,
+        network: NetworkUsers<Settings>,
+        settings: Settings,
     }
 
     #[init(schedule = [blink, poll_eth])]
@@ -52,23 +70,65 @@ const APP: () = {
         let (mut leds, mut network_devices) = setup::setup(c.core, c.device);
 
         log::info!("setup done");
+
+        let mut network = NetworkUsers::new(
+            network_devices.stack,
+            env!("CARGO_BIN_NAME"),
+            network_devices.mac_address,
+            option_env!("BROKER")
+                .unwrap_or("10.34.16.10")
+                .parse()
+                .unwrap(),
+        );
+
+        let settings = Settings::default();
+
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
         c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
 
 
         init::LateResources {
             leds: leds,
-            network: network_devices,
+            network,
+            settings,
         }
     }
 
+    // #[idle(resources=[network], spawn=[settings_update])]
+    // fn idle(mut c: idle::Context) -> ! {
+    //     loop {
+    //         match c.resources.network.lock(|net| net.update()) {
+    //             NetworkState::SettingsChanged => {
+    //                 c.spawn.settings_update().unwrap()
+    //             }
+    //             NetworkState::Updated => {}
+    //             NetworkState::NoChange => cortex_m::asm::wfi(),
+    //         }
+    //     }
+    // }
 
-    #[task(resources = [network], schedule = [poll_eth])]
+    #[task(priority = 1, resources=[network, settings])]
+    fn settings_update(mut c: settings_update::Context) {
+        let settings = c.resources.network.miniconf.settings();
+
+        c.resources.settings.lock(|current| *current = *settings);
+
+        let target = settings.stream_target.into();
+        c.resources.network.direct_stream(target);
+    }
+
+
+    #[task(resources = [network, settings], schedule = [poll_eth],  spawn=[settings_update])]
     fn poll_eth(c: poll_eth::Context) {
         static mut NOW: u32 = 0;
-        let updated = c.resources.network.stack.poll(*NOW);
-        log::info!("{:?}", *NOW);
-        log::info!("{:?}", updated);
+
+        match c.resources.network.lock(|net| net.update(NOW)) {
+            NetworkState::SettingsChanged => {
+                c.spawn.settings_update().unwrap()
+            }
+            NetworkState::Updated => {}
+            NetworkState::NoChange => cortex_m::asm::wfi(),
+        }
         *NOW = *NOW + 1;
         c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
     }

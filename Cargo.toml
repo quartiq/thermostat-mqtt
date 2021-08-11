@@ -34,12 +34,14 @@ cortex-m-log = { version = "0.6", features = ["log-integration"] }
 # uom = { version = "0.30", default-features = false, features = ["autoconvert", "si", "f64", "use_serde"] }
 # eeprom24x = "0.3"
 # serde = { version = "1.0", default-features = false, features = ["derive"] }
-heapless = "0.5"
+heapless = { version = "0.7", features = ["serde"] }
 # serde-json-core = "0.1"
 # sfkv = "0.1"
 serde = { version = "1.0", features = ["derive"], default-features = false }
-miniconf = "0.1.0"
-
+shared-bus = {version = "0.2.2", features = ["cortex-m"] }
+serde-json-core = "0.4"
+mcp23017 = "1.0"
+mutex-trait = "0.2"
 
 cortex-m-rtic = "0.5.6"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
@@ -55,9 +57,9 @@ rev = "70b0eb5"
 git = "https://github.com/quartiq/smoltcp-nal.git"
 rev = "5baf55f"
 
-[patch.crates-io.miniconf]
+[dependencies.miniconf]
 git = "https://github.com/quartiq/miniconf.git"
-rev = "9c826f8"
+rev = "6c19ba2"
 
 [dependencies.minimq]
 git = "https://github.com/quartiq/minimq.git"
@@ -68,9 +70,9 @@ git = "https://github.com/smoltcp-rs/smoltcp"
 # branch = "master"
 rev = "1134eb"
 
-[patch.crates-io.stm32f4xx-hal]
-git = "https://github.com/astro/stm32f4xx-hal.git"
-branch = "flash"
+# [patch.crates-io.stm32f4xx-hal]
+# git = "https://github.com/astro/stm32f4xx-hal.git"
+# branch = "flash"
 
 
 # [features]
