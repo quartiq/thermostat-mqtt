@@ -10,11 +10,13 @@ use crate::{
     leds::Leds,
 };
 
+
 mod leds;
 mod network_users;
-use network_users::NetworkUsers;
+use network_users::{NetworkUsers, NetworkState, UpdateState};
 
 mod setup;
+
 
 use stm32_eth;
 
@@ -53,8 +55,6 @@ impl Default for Settings {
 }
 
 
-
-
 #[rtic::app(device = stm32_eth::stm32, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
 const APP: () = {
 
@@ -81,14 +81,16 @@ const APP: () = {
                 .unwrap(),
         );
 
+        log::info!("Network users done");
+
         let settings = Settings::default();
 
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
         c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
 
-
+        log::info!("init done");
         init::LateResources {
-            leds: leds,
+            leds,
             network,
             settings,
         }
@@ -111,18 +113,16 @@ const APP: () = {
     fn settings_update(mut c: settings_update::Context) {
         let settings = c.resources.network.miniconf.settings();
 
-        c.resources.settings.lock(|current| *current = *settings);
-
-        let target = settings.stream_target.into();
-        c.resources.network.direct_stream(target);
+        // c.resources.settings.lock(|current| *current = *settings);
+        *c.resources.settings = *settings;
     }
 
 
-    #[task(resources = [network, settings], schedule = [poll_eth],  spawn=[settings_update])]
+    #[task(priority = 1, resources = [network], schedule = [poll_eth],  spawn=[settings_update])]
     fn poll_eth(c: poll_eth::Context) {
         static mut NOW: u32 = 0;
 
-        match c.resources.network.lock(|net| net.update(NOW)) {
+        match c.resources.network.update(*NOW) {
             NetworkState::SettingsChanged => {
                 c.spawn.settings_update().unwrap()
             }

@@ -134,9 +134,9 @@ where
         //
         // Poll for incoming data.
         let poll_result = match self.stackref.lock(|stack| stack.poll(now)) {
-            Ok(true) => UpdateState::Updated,
-            Ok(false) => UpdateState::NoChange,
-            Err(_) => UpdateState::Updated,
+            Ok(true) => NetworkState::Updated,
+            Ok(false) =>  NetworkState::NoChange,
+            Err(_) => NetworkState::Updated,
         };
 
         match self.miniconf.update() {

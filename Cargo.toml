@@ -43,7 +43,7 @@ serde-json-core = "0.4"
 mcp23017 = "1.0"
 mutex-trait = "0.2"
 
-cortex-m-rtic = "0.5.6"
+cortex-m-rtic = "0.5.7"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 stm32-eth = { path = "../stm32-eth", features = ["smoltcp-phy", "stm32f427"] }
 # stm32-eth = { version = "0.2.0", features = ["stm32f427"] }
