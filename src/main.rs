@@ -111,6 +111,7 @@ const APP: () = {
 
     #[task(priority = 1, resources=[network, settings])]
     fn settings_update(mut c: settings_update::Context) {
+        log::info!("updating settings");
         let settings = c.resources.network.miniconf.settings();
 
         // c.resources.settings.lock(|current| *current = *settings);
@@ -121,16 +122,18 @@ const APP: () = {
     #[task(priority = 1, resources = [network], schedule = [poll_eth],  spawn=[settings_update])]
     fn poll_eth(c: poll_eth::Context) {
         static mut NOW: u32 = 0;
+        // log::info!("poll eth");
 
         match c.resources.network.update(*NOW) {
             NetworkState::SettingsChanged => {
                 c.spawn.settings_update().unwrap()
             }
             NetworkState::Updated => {}
-            NetworkState::NoChange => cortex_m::asm::wfi(),
+            NetworkState::NoChange => {},
         }
         *NOW = *NOW + 1;
         c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
+        // log::info!("poll eth done");
     }
 
 
