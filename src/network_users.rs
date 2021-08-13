@@ -20,7 +20,7 @@ use crate::setup::{NetworkStack};
 use minimq::embedded_nal::IpAddr;
 // use network_processor::NetworkProcessor;
 use crate::shared::NetworkManager;
-// use telemetry::TelemetryClient;
+use crate::telemetry::TelemetryClient;
 
 use core::fmt::Write;
 use heapless::String;
@@ -43,20 +43,21 @@ pub enum NetworkState {
     NoChange,
 }
 
-pub struct NetworkUsers<S: Default + Miniconf> {
+pub struct NetworkUsers<S: Default + Miniconf, T: Serialize> {
     pub miniconf: miniconf::MqttClient<S, NetworkReference>,
     stackref: NetworkReference,
     // pub processor: NetworkProcessor,
     // stream: DataStream,
     // generator: Option<FrameGenerator>,
-    // pub telemetry: TelemetryClient<T>,
+    pub telemetry: TelemetryClient<T>,
 }
 
-impl<S> NetworkUsers<S>
+impl<S, T> NetworkUsers<S, T>
 where
-    S: Default + Miniconf
+    S: Default + Miniconf,
+    T: Serialize,
 {
-    /// Construct Stabilizer's default network users.
+    /// Construct default network users.
     ///
     /// # Args
     /// * `stack` - The network stack that will be used to share with all network users.
@@ -96,13 +97,13 @@ where
         )
         .unwrap();
 
-        // let telemetry = TelemetryClient::new(
-        //     stack_manager.acquire_stack(),
-        //     &get_client_id(app, "tlm", mac),
-        //     &prefix,
-        //     broker,
-        // );
-        //
+        let telemetry = TelemetryClient::new(
+            stack_manager.acquire_stack(),
+            &get_client_id(app, "tlm", mac),
+            &prefix,
+            broker,
+        );
+
         // let (generator, stream) =
         //     data_stream::setup_streaming(stack_manager.acquire_stack());
 
@@ -112,7 +113,7 @@ where
             miniconf: settings,
             stackref,
             // processor,
-            // telemetry,
+            telemetry,
             // stream,
             // generator: Some(generator),
         }

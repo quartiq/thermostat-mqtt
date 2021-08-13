@@ -13,6 +13,8 @@ use crate::{
 
 mod leds;
 mod network_users;
+mod telemetry;
+use telemetry::Telemetry;
 use network_users::{NetworkUsers, NetworkState, UpdateState};
 
 mod setup;
@@ -60,8 +62,9 @@ const APP: () = {
 
     struct Resources {
         leds: Leds,
-        network: NetworkUsers<Settings>,
+        network: NetworkUsers<Settings, Telemetry>,
         settings: Settings,
+        telemetry: Telemetry,
     }
 
     #[init(schedule = [blink, poll_eth])]
@@ -76,7 +79,7 @@ const APP: () = {
             env!("CARGO_BIN_NAME"),
             network_devices.mac_address,
             option_env!("BROKER")
-                .unwrap_or("10.34.16.10")
+                .unwrap_or("10.42.0.1")
                 .parse()
                 .unwrap(),
         );
@@ -93,6 +96,7 @@ const APP: () = {
             leds,
             network,
             settings,
+            telemetry: Telemetry::default()
         }
     }
 
@@ -137,7 +141,7 @@ const APP: () = {
     }
 
 
-    #[task(resources = [leds], schedule = [blink])]
+    #[task(resources = [leds, network, telemetry, settings], schedule = [blink])]
     fn blink(c: blink::Context) {
         static mut LED_STATE: bool = false;
 
@@ -150,6 +154,21 @@ const APP: () = {
             *LED_STATE = true;
             log::info!("led on");
         }
+        c.resources.telemetry.led = c.resources.settings.led;
+
+        if c.resources.telemetry.led{
+            c.resources.leds.g4.on();
+        }
+        else{
+            c.resources.leds.g4.off();
+        }
+
+        c.resources.network.telemetry.update();
+
+        c.resources
+            .network
+            .telemetry
+            .publish(&c.resources.telemetry);
         c.schedule.blink(c.scheduled + PERIOD.cycles()).unwrap();
 
     }

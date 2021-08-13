@@ -101,7 +101,7 @@ impl TcpSocketStorage {
 impl Default for NetStorage {
     fn default() -> Self {
         NetStorage {
-            ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(192, 168, 1, 50)), 24)],
+            ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(10, 42, 0, 18)), 24)],
             neighbor_cache: [None; 4],
             routes_cache: [None; 4],
             sockets: [None, None, None, None, None],
