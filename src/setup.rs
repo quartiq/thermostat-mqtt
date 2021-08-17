@@ -4,6 +4,9 @@ use log::{error, info, warn};
 
 use crate::{
     leds::Leds,
+    adc::{Adc,
+        Adc_pins,
+    },
 };
 
 
@@ -122,10 +125,15 @@ pub struct NetworkDevices {
     pub mac_address: smoltcp::wire::EthernetAddress,
 }
 
+pub struct Thermostat {
+    pub network_devices: NetworkDevices,
+    pub leds: Leds
+}
+
 pub fn setup(
     mut core: rtic::Peripherals,
     device: stm32_eth::stm32::Peripherals,
-) -> (Leds, NetworkDevices) {
+) -> (Thermostat) {
 
     let mut cp = core;
     cp.SCB.enable_icache();
@@ -301,17 +309,21 @@ pub fn setup(
         mac_address: ethernet_addr,
     };
 
+    let adc_pins = Adc_pins{
+        sck: gpiob.pb10.into_alternate_af5(),
+        miso: gpiob.pb14.into_alternate_af5(),
+        mosi: gpiob.pb15.into_alternate_af5(),
+        sync: gpiob.pb12.into_push_pull_output(),
+    };
+
+    let adc = Adc::new(clocks, dp.SPI2, adc_pins);
 
 
-    // loop {cortex_m::asm::nop();}
+    let mut thermostat = Thermostat {
+        network_devices,
+        leds
+    };
 
-    // let mut leds = Leds::new(gpiod.pd9, gpiod.pd10.into_push_pull_output(), gpiod.pd11.into_push_pull_output());
-    //
-    // leds.r1.on();
-    // leds.g3.on();
-    // leds.g4.off();
-
-
-    (leds, network_devices)
+    thermostat
 
 }

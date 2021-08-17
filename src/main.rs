@@ -18,6 +18,7 @@ use telemetry::Telemetry;
 use network_users::{NetworkUsers, NetworkState, UpdateState};
 
 mod setup;
+mod adc;
 
 
 use stm32_eth;
@@ -70,14 +71,14 @@ const APP: () = {
     #[init(schedule = [blink, poll_eth])]
     fn init(c: init::Context) -> init::LateResources {
 
-        let (mut leds, mut network_devices) = setup::setup(c.core, c.device);
+        let (mut thermostat) = setup::setup(c.core, c.device);
 
         log::info!("setup done");
 
         let mut network = NetworkUsers::new(
-            network_devices.stack,
+            thermostat.network_devices.stack,
             env!("CARGO_BIN_NAME"),
-            network_devices.mac_address,
+            thermostat.network_devices.mac_address,
             option_env!("BROKER")
                 .unwrap_or("10.42.0.1")
                 .parse()
@@ -93,7 +94,7 @@ const APP: () = {
 
         log::info!("init done");
         init::LateResources {
-            leds,
+            leds: thermostat.leds,
             network,
             settings,
             telemetry: Telemetry::default()
