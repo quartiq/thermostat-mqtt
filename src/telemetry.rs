@@ -54,9 +54,7 @@ pub struct Telemetry {
 
 impl Default for Telemetry {
     fn default() -> Self {
-        Self {
-            led: false
-        }
+        Self { led: false }
     }
 }
 
@@ -92,12 +90,7 @@ impl<T: Serialize> TelemetryClient<T> {
     ///
     /// # Returns
     /// A new telemetry client.
-    pub fn new(
-        stack: NetworkReference,
-        client_id: &str,
-        prefix: &str,
-        broker: IpAddr,
-    ) -> Self {
+    pub fn new(stack: NetworkReference, client_id: &str, prefix: &str, broker: IpAddr) -> Self {
         let mqtt = minimq::Minimq::new(broker, client_id, stack).unwrap();
 
         let mut telemetry_topic: String<128> = String::from(prefix);
@@ -119,8 +112,7 @@ impl<T: Serialize> TelemetryClient<T> {
     /// # Args
     /// * `telemetry` - The telemetry to report
     pub fn publish(&mut self, telemetry: &T) {
-        let telemetry: Vec<u8, 256> =
-            serde_json_core::to_vec(telemetry).unwrap();
+        let telemetry: Vec<u8, 256> = serde_json_core::to_vec(telemetry).unwrap();
 
         log::info!("{:?}", telemetry);
         self.mqtt
@@ -137,9 +129,7 @@ impl<T: Serialize> TelemetryClient<T> {
     /// should be called regularly.
     pub fn update(&mut self) {
         match self.mqtt.poll(|_client, _topic, _message, _properties| {}) {
-            Err(minimq::Error::Network(
-                smoltcp_nal::NetworkError::NoIpAddress,
-            )) => {}
+            Err(minimq::Error::Network(smoltcp_nal::NetworkError::NoIpAddress)) => {}
 
             Err(error) => log::info!("Unexpected error: {:?}", error),
             _ => {}

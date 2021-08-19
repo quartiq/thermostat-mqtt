@@ -1,30 +1,17 @@
-
 // Thermostat ADC driver
 // SingularitySurfer 2021
 
-use log::{error, info, warn};
 use core::fmt;
+use log::{error, info, warn};
 
 use stm32_eth::hal::{
-    gpio::{GpioExt,
-        gpiob::*,
-        AF5,
-        Alternate,
-        Output,
-        PushPull
-    },
-    hal::{
-        digital::v2::OutputPin,
-        blocking::spi::Transfer,
-    },
+    gpio::{gpiob::*, Alternate, GpioExt, Output, PushPull, AF5},
+    hal::{blocking::spi::Transfer, digital::v2::OutputPin},
     rcc::Clocks,
-    stm32::{
-        SPI2
-    },
     spi,
     spi::Spi,
+    stm32::SPI2,
     time::MegaHertz,
-
 };
 
 /// SPI Mode 3
@@ -35,7 +22,14 @@ pub const SPI_MODE: spi::Mode = spi::Mode {
 
 pub const SPI_CLOCK: MegaHertz = MegaHertz(2);
 
-pub type AdcSpi = Spi<SPI2, (PB10<Alternate<AF5>>, PB14<Alternate<AF5>>, PB15<Alternate<AF5>>)>;
+pub type AdcSpi = Spi<
+    SPI2,
+    (
+        PB10<Alternate<AF5>>,
+        PB14<Alternate<AF5>>,
+        PB15<Alternate<AF5>>,
+    ),
+>;
 
 pub struct Adc_pins {
     pub sck: PB10<Alternate<AF5>>,
@@ -46,7 +40,7 @@ pub struct Adc_pins {
 
 pub struct Adc {
     spi: AdcSpi,
-    sync: PB12<Output<PushPull>>
+    sync: PB12<Output<PushPull>>,
 }
 
 impl Adc {
@@ -57,9 +51,9 @@ impl Adc {
             (pins.sck, pins.miso, pins.mosi),
             SPI_MODE,
             SPI_CLOCK.into(),
-            clocks
+            clocks,
         );
-        let mut adc = Adc{
+        let mut adc = Adc {
             spi,
             sync: pins.sync,
         };
@@ -75,10 +69,12 @@ impl Adc {
         let result = self.spi.transfer(&mut buf);
         self.sync.set_high();
         match result {
-            Error => warn!("ADC reset failed!"),
-            _ => info!("ADC reset succeeded"),
-        }
+            Err(e) => {
+                warn!("ADC reset failed! {:?}", e)
+            }
+            Ok(_) => {
+                info!("ADC reset succeeded")
+            }
+        };
     }
-
-
 }

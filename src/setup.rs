@@ -1,46 +1,39 @@
-
 //use panic_halt as _;
 use log::{error, info, warn};
 
 use crate::{
+    adc::{Adc, Adc_pins},
     leds::Leds,
-    adc::{Adc,
-        Adc_pins,
-    },
 };
-
 
 use smoltcp_nal::smoltcp;
 use smoltcp_nal::smoltcp::{
-    iface::{InterfaceBuilder, Neighbor, NeighborCache, Routes, Interface},
+    iface::{Interface, InterfaceBuilder, Neighbor, NeighborCache, Routes},
     socket::{SocketHandle, SocketSetItem, TcpSocket, TcpSocketBuffer},
     // time::Instant,
     wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address},
 };
 
 use stm32_eth::{
-    {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
+    hal::delay::Delay,
     hal::gpio::GpioExt,
     hal::rcc::RccExt,
-    hal::delay::Delay,
-    hal::time::{U32Ext, MegaHertz},
-    stm32::{Interrupt, CorePeripherals, Peripherals, SYST},
+    hal::time::{MegaHertz, U32Ext},
+    stm32::{CorePeripherals, Interrupt, Peripherals, SYST},
+    {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
 };
-
 
 use rtt_logger::RTTLogger;
 
 const HSE: MegaHertz = MegaHertz(8);
 
-
 use rtic::cyccnt::{Instant, U32Ext as _};
-
 
 type Eth = stm32_eth::Eth<'static, 'static>;
 
 // const SRC_MAC: [u8; 6] = [0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF];
 // const SRC_MAC: [u8; 6] = [0xF6, 0x48, 0x74, 0xC8, 0xC4, 0x83];
-const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1a];  // eeprom
+const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1a]; // eeprom
 
 const NUM_TCP_SOCKETS: usize = 4;
 const NUM_UDP_SOCKETS: usize = 1;
@@ -50,24 +43,18 @@ pub struct NetStorage {
     pub ip_addrs: [smoltcp::wire::IpCidr; 1],
 
     // Note: There is an additional socket set item required for the DHCP socket.
-    pub sockets:
-        [Option<smoltcp::socket::SocketSetItem<'static>>; NUM_SOCKETS],
+    pub sockets: [Option<smoltcp::socket::SocketSetItem<'static>>; NUM_SOCKETS],
     pub tcp_socket_storage: [TcpSocketStorage; NUM_TCP_SOCKETS],
     pub udp_socket_storage: [UdpSocketStorage; NUM_UDP_SOCKETS],
-    pub neighbor_cache:
-        [Option<(smoltcp::wire::IpAddress, smoltcp::iface::Neighbor)>; 4],
-    pub routes_cache:
-        [Option<(smoltcp::wire::IpCidr, smoltcp::iface::Route)>; 4],
-
+    pub neighbor_cache: [Option<(smoltcp::wire::IpAddress, smoltcp::iface::Neighbor)>; 4],
+    pub routes_cache: [Option<(smoltcp::wire::IpCidr, smoltcp::iface::Route)>; 4],
 }
 
 pub struct UdpSocketStorage {
     rx_storage: [u8; 128],
     tx_storage: [u8; 128],
-    tx_metadata:
-        [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 10],
-    rx_metadata:
-        [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 10],
+    tx_metadata: [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 10],
+    rx_metadata: [smoltcp::storage::PacketMetadata<smoltcp::wire::IpEndpoint>; 10],
 }
 
 impl UdpSocketStorage {
@@ -75,12 +62,8 @@ impl UdpSocketStorage {
         Self {
             rx_storage: [0; 128],
             tx_storage: [0; 128],
-            tx_metadata: [smoltcp::storage::PacketMetadata::<
-                smoltcp::wire::IpEndpoint,
-            >::EMPTY; 10],
-            rx_metadata: [smoltcp::storage::PacketMetadata::<
-                smoltcp::wire::IpEndpoint,
-            >::EMPTY; 10],
+            tx_metadata: [smoltcp::storage::PacketMetadata::<smoltcp::wire::IpEndpoint>::EMPTY; 10],
+            rx_metadata: [smoltcp::storage::PacketMetadata::<smoltcp::wire::IpEndpoint>::EMPTY; 10],
         }
     }
 }
@@ -100,11 +83,13 @@ impl TcpSocketStorage {
     }
 }
 
-
 impl Default for NetStorage {
     fn default() -> Self {
         NetStorage {
-            ip_addrs: [IpCidr::new(IpAddress::from(Ipv4Address::new(10, 42, 0, 18)), 24)],
+            ip_addrs: [IpCidr::new(
+                IpAddress::from(Ipv4Address::new(10, 42, 0, 18)),
+                24,
+            )],
             neighbor_cache: [None; 4],
             routes_cache: [None; 4],
             sockets: [None, None, None, None, None],
@@ -114,11 +99,7 @@ impl Default for NetStorage {
     }
 }
 
-pub type NetworkStack = smoltcp_nal::NetworkStack<
-    'static,
-    'static,
-    &'static mut Eth,
->;
+pub type NetworkStack = smoltcp_nal::NetworkStack<'static, 'static, &'static mut Eth>;
 
 pub struct NetworkDevices {
     pub stack: NetworkStack,
@@ -127,14 +108,10 @@ pub struct NetworkDevices {
 
 pub struct Thermostat {
     pub network_devices: NetworkDevices,
-    pub leds: Leds
+    pub leds: Leds,
 }
 
-pub fn setup(
-    mut core: rtic::Peripherals,
-    device: stm32_eth::stm32::Peripherals,
-) -> (Thermostat) {
-
+pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> (Thermostat) {
     let mut cp = core;
     cp.SCB.enable_icache();
     // cp.SCB.enable_dcache(&mut cp.CPUID);
@@ -150,8 +127,9 @@ pub fn setup(
     });
     dp.RCC.ahb1enr.modify(|_, w| w.dma1en().enabled());
 
-
-    let clocks = dp.RCC.constrain()
+    let clocks = dp
+        .RCC
+        .constrain()
         .cfgr
         .use_hse(HSE)
         .sysclk(168.mhz())
@@ -159,7 +137,6 @@ pub fn setup(
         .pclk1(32.mhz())
         .pclk2(64.mhz())
         .freeze();
-
 
     // setup Logger
     static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
@@ -178,9 +155,13 @@ pub fn setup(
 
     log::trace!("waiting a bit");
 
-    let mut leds = Leds::new(gpiod.pd9, gpiod.pd10.into_push_pull_output(), gpiod.pd11.into_push_pull_output());
+    let mut leds = Leds::new(
+        gpiod.pd9,
+        gpiod.pd10.into_push_pull_output(),
+        gpiod.pd11.into_push_pull_output(),
+    );
 
-    for _ in 0..100000{
+    for _ in 0..100000 {
         leds.g3.on();
         leds.g3.off();
     }
@@ -189,8 +170,6 @@ pub fn setup(
     leds.g3.on();
     leds.g4.off();
     log::trace!("waited a bit");
-
-
 
     // Setup ethernet.
     info!("Setup ethernet");
@@ -223,7 +202,8 @@ pub fn setup(
                 PhyAddress::_0,
                 clocks,
                 eth_pins,
-            ).unwrap();
+            )
+            .unwrap();
             info!("Created ethernet");
             ETH = Some(eth);
             ETH.as_mut().unwrap()
@@ -233,13 +213,9 @@ pub fn setup(
     info!("Enabling ethernet interrupt");
     eth.enable_interrupt();
 
+    let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
 
-    let store =
-        cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
-
-
-    let neighbor_cache =
-        smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);
+    let neighbor_cache = smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);
 
     // let i = match store.ip_addrs[0].address() {
     //     IpAddress::Ipv4(addr) => addr,
@@ -252,7 +228,6 @@ pub fn setup(
         .add_default_ipv4_route(Ipv4Address::UNSPECIFIED)
         .unwrap();
 
-
     info!("Setup interface");
 
     let ethernet_addr = EthernetAddress(SRC_MAC);
@@ -263,20 +238,14 @@ pub fn setup(
         .routes(routes)
         .finalize();
 
-
     info!("Setup sockets");
     let sockets = {
-        let mut sockets =
-            smoltcp::socket::SocketSet::new(&mut store.sockets[..]);
+        let mut sockets = smoltcp::socket::SocketSet::new(&mut store.sockets[..]);
 
         for storage in store.tcp_socket_storage[..].iter_mut() {
             let tcp_socket = {
-                let rx_buffer = smoltcp::socket::TcpSocketBuffer::new(
-                    &mut storage.rx_storage[..],
-                );
-                let tx_buffer = smoltcp::socket::TcpSocketBuffer::new(
-                    &mut storage.tx_storage[..],
-                );
+                let rx_buffer = smoltcp::socket::TcpSocketBuffer::new(&mut storage.rx_storage[..]);
+                let tx_buffer = smoltcp::socket::TcpSocketBuffer::new(&mut storage.tx_storage[..]);
 
                 smoltcp::socket::TcpSocket::new(rx_buffer, tx_buffer)
             };
@@ -309,7 +278,7 @@ pub fn setup(
         mac_address: ethernet_addr,
     };
 
-    let adc_pins = Adc_pins{
+    let adc_pins = Adc_pins {
         sck: gpiob.pb10.into_alternate_af5(),
         miso: gpiob.pb14.into_alternate_af5(),
         mosi: gpiob.pb15.into_alternate_af5(),
@@ -318,12 +287,10 @@ pub fn setup(
 
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
 
-
     let mut thermostat = Thermostat {
         network_devices,
-        leds
+        leds,
     };
 
     thermostat
-
 }

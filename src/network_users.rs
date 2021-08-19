@@ -15,7 +15,7 @@ pub use serde;
 // pub mod shared;
 // pub mod telemetry;
 
-use crate::setup::{NetworkStack};
+use crate::setup::NetworkStack;
 // use data_stream::{BlockGenerator, DataStream};
 use minimq::embedded_nal::IpAddr;
 // use network_processor::NetworkProcessor;
@@ -78,8 +78,7 @@ where
         broker: IpAddr,
     ) -> Self {
         let stack_manager =
-            cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack))
-                .unwrap();
+            cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
 
         // let processor = NetworkProcessor::new(
         //     stack_manager.acquire_stack(),
@@ -119,7 +118,6 @@ where
         }
     }
 
-
     /// Update and process all of the network users state.
     ///
     /// # Returns
@@ -136,7 +134,7 @@ where
         // Poll for incoming data.
         let poll_result = match self.stackref.lock(|stack| stack.poll(now)) {
             Ok(true) => NetworkState::Updated,
-            Ok(false) =>  NetworkState::NoChange,
+            Ok(false) => NetworkState::NoChange,
             Err(_) => NetworkState::Updated,
         };
 
@@ -145,8 +143,6 @@ where
             _ => poll_result,
         }
     }
-
-
 }
 
 /// Get an MQTT client ID for a client.

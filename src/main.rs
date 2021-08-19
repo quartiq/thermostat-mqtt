@@ -1,31 +1,23 @@
 #![no_std]
 #![no_main]
 
-
-
-use panic_halt as _;
 use log::{error, info, warn};
+use panic_halt as _;
 
-use crate::{
-    leds::Leds,
-};
-
+use crate::leds::Leds;
 
 mod leds;
 mod network_users;
 mod telemetry;
+use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::Telemetry;
-use network_users::{NetworkUsers, NetworkState, UpdateState};
 
-mod setup;
 mod adc;
-
+mod setup;
 
 use stm32_eth;
 
-use stm32_eth::{
-    stm32::{Peripherals},
-};
+use stm32_eth::stm32::Peripherals;
 
 use rtic::cyccnt::{Instant, U32Ext as _};
 
@@ -39,9 +31,7 @@ pub mod shared;
 pub use miniconf::Miniconf;
 pub use serde::Deserialize;
 
-const PERIOD: u32 = 1<<25;
-
-
+const PERIOD: u32 = 1 << 25;
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct Settings {
@@ -51,16 +41,12 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self {
-            led: false,
-        }
+        Self { led: false }
     }
 }
 
-
 #[rtic::app(device = stm32_eth::stm32, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
 const APP: () = {
-
     struct Resources {
         leds: Leds,
         network: NetworkUsers<Settings, Telemetry>,
@@ -70,7 +56,6 @@ const APP: () = {
 
     #[init(schedule = [blink, poll_eth])]
     fn init(c: init::Context) -> init::LateResources {
-
         let (mut thermostat) = setup::setup(c.core, c.device);
 
         log::info!("setup done");
@@ -97,7 +82,7 @@ const APP: () = {
             leds: thermostat.leds,
             network,
             settings,
-            telemetry: Telemetry::default()
+            telemetry: Telemetry::default(),
         }
     }
 
@@ -123,24 +108,20 @@ const APP: () = {
         *c.resources.settings = *settings;
     }
 
-
     #[task(priority = 1, resources = [network], schedule = [poll_eth],  spawn=[settings_update])]
     fn poll_eth(c: poll_eth::Context) {
         static mut NOW: u32 = 0;
         // log::info!("poll eth");
 
         match c.resources.network.update(*NOW) {
-            NetworkState::SettingsChanged => {
-                c.spawn.settings_update().unwrap()
-            }
+            NetworkState::SettingsChanged => c.spawn.settings_update().unwrap(),
             NetworkState::Updated => {}
-            NetworkState::NoChange => {},
+            NetworkState::NoChange => {}
         }
         *NOW = *NOW + 1;
         c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
         // log::info!("poll eth done");
     }
-
 
     #[task(resources = [leds, network, telemetry, settings], schedule = [blink])]
     fn blink(c: blink::Context) {
@@ -157,10 +138,9 @@ const APP: () = {
         }
         c.resources.telemetry.led = c.resources.settings.led;
 
-        if c.resources.telemetry.led{
+        if c.resources.telemetry.led {
             c.resources.leds.g4.on();
-        }
-        else{
+        } else {
             c.resources.leds.g4.off();
         }
 
@@ -171,7 +151,6 @@ const APP: () = {
             .telemetry
             .publish(&c.resources.telemetry);
         c.schedule.blink(c.scheduled + PERIOD.cycles()).unwrap();
-
     }
 
     #[task(binds = ETH, priority = 1)]
