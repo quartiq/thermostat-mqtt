@@ -60,6 +60,12 @@ impl Adc {
 
         adc.reset();
 
+        adc.transfer(0x10, Some(0x2));
+
+        let result = adc.transfer(0x12, None);
+
+        warn!("ADC write and readback: {:?}", result);
+
         adc
     }
 
@@ -76,5 +82,27 @@ impl Adc {
                 info!("ADC reset succeeded")
             }
         };
+    }
+
+    fn transfer(&mut self, addr: u8, reg_data: Option<u8>) -> Option<u8> {
+        let mut addr_buf = [addr];
+
+        let _ = self.sync.set_low();
+        let _ = self.spi.transfer(&mut addr_buf);
+        match reg_data {
+            Some(data) => {
+                let mut data_buf = [data];
+                let _ = self.spi.transfer(&mut data_buf);
+                let _ = self.sync.set_high();
+                None
+            }
+            None => {
+                let mut data_buf = [0];
+                let result = self.spi.transfer(&mut data_buf);
+                let _ = self.sync.set_high();
+                Some(result.unwrap()[0])
+            }
+        }
+
     }
 }
