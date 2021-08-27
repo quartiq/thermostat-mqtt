@@ -49,40 +49,42 @@ impl Default for Settings {
 const APP: () = {
     struct Resources {
         leds: Leds,
-        network: NetworkUsers<Settings, Telemetry>,
-        settings: Settings,
-        telemetry: Telemetry,
+        // network: NetworkUsers<Settings, Telemetry>,
+        // settings: Settings,
+        // telemetry: Telemetry,
     }
 
-    #[init(schedule = [blink, poll_eth])]
+    // #[init(schedule = [blink, poll_eth])]
+    #[init(schedule = [blink])]
     fn init(c: init::Context) -> init::LateResources {
         let (mut thermostat) = setup::setup(c.core, c.device);
 
+
         log::info!("setup done");
 
-        let mut network = NetworkUsers::new(
-            thermostat.network_devices.stack,
-            env!("CARGO_BIN_NAME"),
-            thermostat.network_devices.mac_address,
-            option_env!("BROKER")
-                .unwrap_or("10.42.0.1")
-                .parse()
-                .unwrap(),
-        );
+        // let mut network = NetworkUsers::new(
+        //     thermostat.network_devices.stack,
+        //     env!("CARGO_BIN_NAME"),
+        //     thermostat.network_devices.mac_address,
+        //     option_env!("BROKER")
+        //         .unwrap_or("10.42.0.1")
+        //         .parse()
+        //         .unwrap(),
+        // );
 
-        log::info!("Network users done");
+        // log::info!("Network users done");
 
-        let settings = Settings::default();
+        // let settings = Settings::default();
 
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
-        c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
+        // c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
 
         log::info!("init done");
         init::LateResources {
             leds: thermostat.leds,
-            network,
-            settings,
-            telemetry: Telemetry::default(),
+            // network,
+            // settings,
+            // telemetry: Telemetry::default(),
         }
     }
 
@@ -99,31 +101,32 @@ const APP: () = {
     //     }
     // }
 
-    #[task(priority = 1, resources=[network, settings])]
-    fn settings_update(mut c: settings_update::Context) {
-        log::info!("updating settings");
-        let settings = c.resources.network.miniconf.settings();
+    // #[task(priority = 1, resources=[network, settings])]
+    // fn settings_update(mut c: settings_update::Context) {
+    //     log::info!("updating settings");
+    //     let settings = c.resources.network.miniconf.settings();
 
-        // c.resources.settings.lock(|current| *current = *settings);
-        *c.resources.settings = *settings;
-    }
+    //     // c.resources.settings.lock(|current| *current = *settings);
+    //     *c.resources.settings = *settings;
+    // }
 
-    #[task(priority = 1, resources = [network], schedule = [poll_eth],  spawn=[settings_update])]
-    fn poll_eth(c: poll_eth::Context) {
-        static mut NOW: u32 = 0;
-        // log::info!("poll eth");
+    // #[task(priority = 1, resources = [network], schedule = [poll_eth],  spawn=[settings_update])]
+    // fn poll_eth(c: poll_eth::Context) {
+    //     static mut NOW: u32 = 0;
+    //     // log::info!("poll eth");
 
-        match c.resources.network.update(*NOW) {
-            NetworkState::SettingsChanged => c.spawn.settings_update().unwrap(),
-            NetworkState::Updated => {}
-            NetworkState::NoChange => {}
-        }
-        *NOW = *NOW + 1;
-        c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
-        // log::info!("poll eth done");
-    }
+    //     match c.resources.network.update(*NOW) {
+    //         NetworkState::SettingsChanged => c.spawn.settings_update().unwrap(),
+    //         NetworkState::Updated => {}
+    //         NetworkState::NoChange => {}
+    //     }
+    //     *NOW = *NOW + 1;
+    //     c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
+    //     // log::info!("poll eth done");
+    // }
 
-    #[task(resources = [leds, network, telemetry, settings], schedule = [blink])]
+    // #[task(resources = [leds, network, telemetry, settings], schedule = [blink])]
+    #[task(priority = 1, resources = [leds], schedule = [blink])]
     fn blink(c: blink::Context) {
         static mut LED_STATE: bool = false;
 
@@ -136,28 +139,28 @@ const APP: () = {
             *LED_STATE = true;
             log::info!("led on");
         }
-        c.resources.telemetry.led = c.resources.settings.led;
+        // c.resources.telemetry.led = c.resources.settings.led;
 
-        if c.resources.telemetry.led {
-            c.resources.leds.g4.on();
-        } else {
-            c.resources.leds.g4.off();
-        }
+        // if c.resources.telemetry.led {
+        //     c.resources.leds.g4.on();
+        // } else {
+        //     c.resources.leds.g4.off();
+        // }
 
-        c.resources.network.telemetry.update();
+        // c.resources.network.telemetry.update();
 
-        c.resources
-            .network
-            .telemetry
-            .publish(&c.resources.telemetry);
+        // c.resources
+        //     .network
+        //     .telemetry
+        //     .publish(&c.resources.telemetry);
         c.schedule.blink(c.scheduled + PERIOD.cycles()).unwrap();
     }
 
-    #[task(binds = ETH, priority = 1)]
-    fn eth(_: eth::Context) {
-        let p = unsafe { Peripherals::steal() };
-        stm32_eth::eth_interrupt_handler(&p.ETHERNET_DMA);
-    }
+    // #[task(binds = ETH, priority = 1)]
+    // fn eth(_: eth::Context) {
+    //     let p = unsafe { Peripherals::steal() };
+    //     stm32_eth::eth_interrupt_handler(&p.ETHERNET_DMA);
+    // }
 
     extern "C" {
         fn EXTI0();
