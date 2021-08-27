@@ -387,6 +387,7 @@ name = "mqtt-thermostat"
 version = "0.0.0"
 dependencies = [
  "bare-metal 1.0.0",
+ "byteorder",
  "cortex-m 0.7.2",
  "cortex-m-log",
  "cortex-m-rt",
