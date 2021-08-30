@@ -28,7 +28,7 @@ pub const SPI_CLOCK: MegaHertz = MegaHertz(2);
 const ID: u8 = 0x7;
 const ADCMODE: u8 = 0x1;
 const IFMODE: u8 = 0x2;
-const DATA: u8 = 0x44;
+const DATA: u8 = 0x04;
 const FILTCON0: u8 = 0x28;
 const FILTCON1: u8 = 0x29;
 const FILTCON2: u8 = 0x2a;
@@ -85,25 +85,29 @@ impl Adc {
             spi,
             sync: pins.sync,
         };
-
+        
         adc.reset();
 
         let before = adc.read_reg(IFMODE, 2);
-        adc.write_reg(IFMODE, 2, before|0x20);
+        adc.write_reg(IFMODE, 2, before|0b100_0000);    // set DATA_STAT bit 
+        info!("ifmode con: {:#X}", adc.read_reg(IFMODE, 2));
 
         info!("filt con: {:#X}", adc.read_reg(FILTCON0, 2));
 
         let before = adc.read_reg(FILTCON0, 2);
         adc.write_reg(FILTCON0, 2, (before & 0xffe0) | 0x8); // set data rate CH0 to 1 kSPS
 
-        adc.write_reg(CH1, 2, 0x8043); // enable second channel
+        info!("ch1: {:#X}", adc.read_reg(CH1, 2));
+        adc.write_reg(CH1, 2, 0x8043); // enable second channel and configure Ain2, Ain3
 
-        let before = adc.read_reg(FILTCON1, 2);
-        adc.write_reg(FILTCON1, 2, (before & 0xffe0) | 0x8); // set data rate CH1 to 1 kSPS
+        // adc.write_reg(CH1, 2, 0x8001); // enable second channel
+
+
+        // let before = adc.read_reg(FILTCON1, 2);
+        // adc.write_reg(FILTCON1, 2, (before & 0xffe0) | 0x8); // set data rate CH1 to 1 kSPS
 
         info!("ch0: {:#X}", adc.read_reg(CH0, 2));
         info!("ch1: {:#X}", adc.read_reg(CH1, 2));
-
 
         info!("filt con: {:#X}", adc.read_reg(FILTCON0, 2));
 
@@ -129,15 +133,21 @@ impl Adc {
     }
 
     fn print_continuous_conversion(&mut self) {
+        let (mut data1, mut data2) = (0,0);
         loop {
             let mut statreg = 0xff;
             while statreg == 0xff {
                 statreg = self.get_status_reg();
-                // info!("statreg: {:#X}", self.get_status_reg());
+                // info!("statreg: {:#X}", statreg);
             }
-            info!("statreg: {:#X}", self.get_status_reg());
-            info!("data: {:#X}", self.read_reg(0x44, 4));
-
+            // info!("statreg: {:#X}", self.get_status_reg());
+            let (data, ch) = self.read_data();
+            if ch == 0{
+                data1 = data;
+            } else{
+                data2 = data;
+            }
+            info!("data, ch: {:#X}, {:?},   data2, ch2: {:#X}, {:?}", data1, ch, data2, ch);
         }
     }
 
@@ -206,5 +216,14 @@ impl Adc {
         let _ = self.spi.transfer(&mut addr_buf);
         let _ = self.sync.set_high();
         addr_buf[0]
+    }
+
+    fn read_data(&mut self) -> (u32, u8) {
+        /// Reads the data register and returns data and channel information.
+        /// The DATA_STAT bit has to be set in the IFMODE register.
+        let datach = self.read_reg(DATA, 4);
+        let ch = (datach&0x3) as u8;
+        let data = datach >> 8;
+        (data, ch)
     }
 }
