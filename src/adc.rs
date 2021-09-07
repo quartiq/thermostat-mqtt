@@ -59,7 +59,7 @@ pub type AdcSpi = Spi<
     ),
 >;
 
-pub struct Adc_pins {
+pub struct AdcPins {
     pub sck: PB10<Alternate<AF5>>,
     pub miso: PB14<Alternate<AF5>>,
     pub mosi: PB15<Alternate<AF5>>,
@@ -72,7 +72,7 @@ pub struct Adc {
 }
 
 impl Adc {
-    pub fn new(clocks: Clocks, spi2: SPI2, mut pins: Adc_pins) -> Self {
+    pub fn new(clocks: Clocks, spi2: SPI2, mut pins: AdcPins) -> Self {
         pins.sync.set_high();
         let spi = Spi::spi2(
             spi2,
