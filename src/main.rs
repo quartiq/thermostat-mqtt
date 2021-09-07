@@ -13,6 +13,7 @@ use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::Telemetry;
 
 mod adc;
+mod dac;
 mod setup;
 
 use stm32_eth;

@@ -2,7 +2,8 @@
 use log::{error, info, warn};
 
 use crate::{
-    adc::{Adc, Adc_pins},
+    adc::{Adc, AdcPins},
+    dac::{Dacs, Dac0Pins, Dac1Pins, Pwms, duty},
     leds::Leds,
 };
 
@@ -16,9 +17,10 @@ use smoltcp_nal::smoltcp::{
 
 use stm32_eth::{
     hal::delay::Delay,
-    hal::gpio::GpioExt,
+    hal::gpio::{gpioe::*, GpioExt},
     hal::rcc::RccExt,
     hal::time::{MegaHertz, U32Ext},
+    hal::hal::{PwmPin, digital::v2::OutputPin},
     stm32::{CorePeripherals, Interrupt, Peripherals, SYST},
     {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
 };
@@ -151,7 +153,12 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     let gpiob = dp.GPIOB.split();
     let gpioc = dp.GPIOC.split();
     let gpiod = dp.GPIOD.split();
+    let gpioe = dp.GPIOE.split();
     let gpiog = dp.GPIOG.split();
+    let gpiof = dp.GPIOF.split();
+
+    let tim1 = dp.TIM1;
+    let tim3 = dp.TIM3;
 
     log::trace!("waiting a bit");
 
@@ -278,14 +285,50 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     //     mac_address: ethernet_addr,
     // };
 
-    let adc_pins = Adc_pins {
+    let adc_pins = AdcPins {
         sck: gpiob.pb10.into_alternate_af5(),
         miso: gpiob.pb14.into_alternate_af5(),
         mosi: gpiob.pb15.into_alternate_af5(),
         sync: gpiob.pb12.into_push_pull_output(),
     };
 
+    let dac0_pins = Dac0Pins {
+        sck: gpioe.pe2.into_alternate_af5(),
+        mosi: gpioe.pe6.into_alternate_af5(),
+        sync: gpioe.pe4.into_push_pull_output(),
+    };
+
+    let dac1_pins = Dac1Pins {
+        sck: gpiof.pf7.into_alternate_af5(),
+        mosi: gpiof.pf9.into_alternate_af5(),
+        sync: gpiof.pf6.into_push_pull_output(),
+    };
+
+    let mut dacs = Dacs::new(clocks, dp.SPI4, dp.SPI5, dac0_pins, dac1_pins);
+
+    let mut pwms = Pwms::new(
+        clocks, tim1, tim3,
+        gpioc.pc6, gpioc.pc7,
+        gpioe.pe9, gpioe.pe11,
+        gpioe.pe13, gpioe.pe14,
+        gpioe.pe10.into_push_pull_output(),
+    );
+
+    let _ = pwms.shdn.set_high();
+    pwms.set(0.5, 0);   // max_v0
+    pwms.set(0.5, 1);   // max_v1
+    pwms.set(0.5, 2);   
+    pwms.set(0.5, 3);   
+    pwms.set(0.5, 4);   
+    pwms.set(0.5, 5);   
+
+    // TODO: second MAX channel, DAC nonfunctional
+
+    // dacs.set(0x02fff, 0);
+    // dacs.set(0x0ffff, 1);
+
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
+    
 
     let mut thermostat = Thermostat {
         // network_devices,
