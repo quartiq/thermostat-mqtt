@@ -98,14 +98,19 @@ impl Adc {
         adc.write_reg(FILTCON0, 2, (before & 0xffe0) | 0x8); // set data rate CH0 to 1 kSPS
 
         info!("ch1: {:#X}", adc.read_reg(CH1, 2));
+        info!("ch0: {:#X}", adc.read_reg(CH0, 2));
+
         adc.write_reg(CH1, 2, 0x8043); // enable second channel and configure Ain2, Ain3
 
-        // adc.write_reg(CH1, 2, 0x8001); // enable second channel
+        adc.write_reg(CH0, 2, 0x8001); // enable second channel
 
 
         // let before = adc.read_reg(FILTCON1, 2);
         // adc.write_reg(FILTCON1, 2, (before & 0xffe0) | 0x8); // set data rate CH1 to 1 kSPS
 
+        adc.setup_channels();
+
+        info!("ch0: {:#X}", adc.read_reg(CH0, 2));
         info!("ch0: {:#X}", adc.read_reg(CH0, 2));
         info!("ch1: {:#X}", adc.read_reg(CH1, 2));
 
@@ -119,9 +124,9 @@ impl Adc {
 
     pub fn reset(&mut self) {
         let mut buf = [0xFFu8; 8];
-        self.sync.set_low();
+        let _ = self.sync.set_low();
         let result = self.spi.transfer(&mut buf);
-        self.sync.set_high();
+        let _ = self.sync.set_high();
         match result {
             Err(e) => {
                 warn!("ADC reset failed! {:?}", e)
@@ -138,9 +143,8 @@ impl Adc {
             let mut statreg = 0xff;
             while statreg == 0xff {
                 statreg = self.get_status_reg();
-                // info!("statreg: {:#X}", statreg);
             }
-            // info!("statreg: {:#X}", self.get_status_reg());
+
             let (data, ch) = self.read_data();
             if ch == 0{
                 data1 = data;
@@ -226,4 +230,42 @@ impl Adc {
         let data = datach >> 8;
         (data, ch)
     }
+
+    fn setup_channels(&mut self){
+        /// Setup ADC channels.
+        
+        // enable first channel and configure Ain0, Ain1,
+        // set config 0 for second channel, 
+        self.write_reg(CH0, 2, 0x8001); 
+
+        // enable second channel and configure Ain2, Ain3,
+        // set config 1 for second channel, 
+        self.write_reg(CH1, 2, 0x9043); 
+
+        // Setup configuration register ch0
+        let rbp = 1<<11; // REFBUF+
+        let rbn = 1<<10; // REFBUF-
+        let abp = 1<<9; // AINBUF-
+        let abn = 1<<8; // AINBUF+
+        let unip = 0<<12; // BI_UNIPOLAR
+        let refsel = 00<<4; // REF_SEL
+        self.write_reg(SETUPCON0, 2, rbp|rbn|abp|abn|unip|refsel); 
+
+        // Setup configuration register ch1
+        let rbp = 1<<11; // REFBUF+
+        let rbn = 1<<10; // REFBUF-
+        let abp = 1<<9; // AINBUF-
+        let abn = 1<<8; // AINBUF+
+        let unip = 0<<12; // BI_UNIPOLAR
+        let refsel = 00<<4; // REF_SEL
+        self.write_reg(SETUPCON1, 2, rbp|rbn|abp|abn|unip|refsel);
+
+        // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
+        self.write_reg(FILTCON0, 2, 0b110<<8|1<<11|0b10011);
+        
+        // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
+        self.write_reg(FILTCON1, 2, 0b110<<8|1<<11|0b10011);
+
+    }
+
 }
