@@ -69,7 +69,8 @@ pub struct Pwms {
     pub max_i_pos1: PwmChannels<TIM1, pwm::C2>,
     pub max_i_neg0: PwmChannels<TIM1, pwm::C3>,
     pub max_i_neg1: PwmChannels<TIM1, pwm::C4>,
-    pub shdn: PE10<Output<PushPull>>,
+    pub shdn0: PE10<Output<PushPull>>,
+    pub shdn1: PE15<Output<PushPull>>,
 }
 
 impl Pwms {
@@ -83,7 +84,8 @@ impl Pwms {
         max_i_pos1: PE11<M4>,
         max_i_neg0: PE13<M5>,
         max_i_neg1: PE14<M6>,
-        shdn: PE10<Output<PushPull>>,
+        shdn0: PE10<Output<PushPull>>,
+        shdn1: PE15<Output<PushPull>>,
     ) -> Pwms {
         let freq = 20u32.khz();
 
@@ -116,7 +118,7 @@ impl Pwms {
             max_v0, max_v1,
             max_i_pos0, max_i_pos1,
             max_i_neg0, max_i_neg1,
-            shdn
+            shdn0, shdn1
         }
     }
 

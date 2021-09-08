@@ -312,9 +312,11 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
         gpioe.pe9, gpioe.pe11,
         gpioe.pe13, gpioe.pe14,
         gpioe.pe10.into_push_pull_output(),
+        gpioe.pe15.into_push_pull_output(),
     );
 
-    let _ = pwms.shdn.set_high();
+    let _ = pwms.shdn0.set_high();
+    let _ = pwms.shdn1.set_high();
     pwms.set(0.5, 0);   // max_v0
     pwms.set(0.5, 1);   // max_v1
     pwms.set(0.5, 2);   
@@ -322,10 +324,10 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     pwms.set(0.5, 4);   
     pwms.set(0.5, 5);   
 
-    // TODO: second MAX channel, DAC nonfunctional
+    // TODO: second MAX channel
 
-    dacs.set(0x1ffff, 0);
-    dacs.set(0x1ffff, 1);
+    dacs.set(0x17fff, 0);
+    dacs.set(0x17fff, 1);
 
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
     
