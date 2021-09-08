@@ -7,6 +7,7 @@
 use byteorder::{BigEndian, ByteOrder};
 use core::fmt;
 use log::{error, info, warn};
+use cortex_m::asm::delay;
 
 use stm32_eth::hal::{
     gpio::{gpioe::*, gpiof::*, gpioc::*, Alternate, Output, PushPull, AF5},
@@ -125,7 +126,7 @@ impl Pwms {
             let value = ((duty * (max as f64)) as u16).min(max);
             pin.set_duty(value);
         }
-        match (ch) {
+        match ch {
             0 =>
                 set(&mut self.max_v0, duty),
             1 =>
@@ -142,10 +143,6 @@ impl Pwms {
                 unreachable!(),
         }
     }
-}
-
-pub fn duty(duty:f64) -> u16 {
-    ((duty * (MAX_DUTY as f64)) as u16).min(MAX_DUTY)
 }
 
 pub struct Dacs {
@@ -199,20 +196,16 @@ impl Dacs {
         if ch == 0 {
             let _ = self.sync0.set_high();
             // must be high for >= 33 ns
-            let mut n = 1000;
-            while n>0 {
-                n-=1;
-            };
+            delay(1000);
             let _ = self.sync0.set_low();
-            let _ = self.spi0.transfer(&mut buf);
+            info!("res: {:?}", buf);
+            let res = self.spi0.transfer(&mut buf);
+            info!("res: {:?}", res);
         }
         else {
             let _ = self.sync1.set_high();
             // must be high for >= 33 ns
-            let mut n = 1000;
-            while n>0 {
-                n-=1;
-            };
+            delay(1000);
             let _ = self.sync1.set_low();
             let _ = self.spi1.transfer(&mut buf);
         }

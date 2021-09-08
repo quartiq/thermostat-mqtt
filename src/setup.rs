@@ -3,7 +3,7 @@ use log::{error, info, warn};
 
 use crate::{
     adc::{Adc, AdcPins},
-    dac::{Dacs, Dac0Pins, Dac1Pins, Pwms, duty},
+    dac::{Dacs, Dac0Pins, Dac1Pins, Pwms},
     leds::Leds,
 };
 
@@ -324,8 +324,8 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
 
     // TODO: second MAX channel, DAC nonfunctional
 
-    // dacs.set(0x02fff, 0);
-    // dacs.set(0x0ffff, 1);
+    dacs.set(0x1ffff, 0);
+    dacs.set(0x1ffff, 1);
 
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
     
