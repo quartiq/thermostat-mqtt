@@ -116,7 +116,7 @@ impl Adc {
 
         info!("filt con: {:#X}", adc.read_reg(FILTCON0, 2));
 
-        adc.print_continuous_conversion();
+        // adc.print_continuous_conversion();
 
 
         adc
@@ -214,7 +214,7 @@ impl Adc {
         };
     }
 
-    fn get_status_reg(&mut self) -> u8 {
+    pub fn get_status_reg(&mut self) -> u8 {
         let mut addr_buf = [0];
         let _ = self.sync.set_low();
         let _ = self.spi.transfer(&mut addr_buf);
@@ -222,7 +222,7 @@ impl Adc {
         addr_buf[0]
     }
 
-    fn read_data(&mut self) -> (u32, u8) {
+    pub fn read_data(&mut self) -> (u32, u8) {
         /// Reads the data register and returns data and channel information.
         /// The DATA_STAT bit has to be set in the IFMODE register.
         let datach = self.read_reg(DATA, 4);

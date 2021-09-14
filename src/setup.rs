@@ -109,8 +109,11 @@ pub struct NetworkDevices {
 }
 
 pub struct Thermostat {
-    // pub network_devices: NetworkDevices,
+    pub network_devices: NetworkDevices,
     pub leds: Leds,
+    pub adc: Adc,
+    pub dacs: Dacs,
+    pub pwms: Pwms
 }
 
 pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> Thermostat {
@@ -181,109 +184,109 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     // Setup ethernet.
     info!("Setup ethernet");
 
-    // let eth_pins = EthPins {
-    //     ref_clk: gpioa.pa1,
-    //     md_io: gpioa.pa2,
-    //     md_clk: gpioc.pc1,
-    //     crs: gpioa.pa7,
-    //     tx_en: gpiob.pb11,
-    //     tx_d0: gpiog.pg13,
-    //     tx_d1: gpiob.pb13,
-    //     rx_d0: gpioc.pc4,
-    //     rx_d1: gpioc.pc5,
+    let eth_pins = EthPins {
+        ref_clk: gpioa.pa1,
+        md_io: gpioa.pa2,
+        md_clk: gpioc.pc1,
+        crs: gpioa.pa7,
+        tx_en: gpiob.pb11,
+        tx_d0: gpiog.pg13,
+        tx_d1: gpiob.pb13,
+        rx_d0: gpioc.pc4,
+        rx_d1: gpioc.pc5,
+    };
+
+    let eth = {
+        static mut RX_RING: Option<[RingEntry<RxDescriptor>; 4]> = None;
+        static mut TX_RING: Option<[RingEntry<TxDescriptor>; 4]> = None;
+        static mut ETH: Option<Eth> = None;
+        unsafe {
+            RX_RING = Some(Default::default());
+            TX_RING = Some(Default::default());
+            info!("Creating ethernet");
+            let eth = Eth::new(
+                dp.ETHERNET_MAC,
+                dp.ETHERNET_DMA,
+                &mut RX_RING.as_mut().unwrap()[..],
+                &mut TX_RING.as_mut().unwrap()[..],
+                PhyAddress::_0,
+                clocks,
+                eth_pins,
+            )
+            .unwrap();
+            info!("Created ethernet");
+            ETH = Some(eth);
+            ETH.as_mut().unwrap()
+        }
+    };
+
+    info!("Enabling ethernet interrupt");
+    eth.enable_interrupt();
+
+    let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
+
+    let neighbor_cache = smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);
+
+    // let i = match store.ip_addrs[0].address() {
+    //     IpAddress::Ipv4(addr) => addr,
+    //     _ => unreachable!(),
     // };
 
-    // let eth = {
-    //     static mut RX_RING: Option<[RingEntry<RxDescriptor>; 4]> = None;
-    //     static mut TX_RING: Option<[RingEntry<TxDescriptor>; 4]> = None;
-    //     static mut ETH: Option<Eth> = None;
-    //     unsafe {
-    //         RX_RING = Some(Default::default());
-    //         TX_RING = Some(Default::default());
-    //         info!("Creating ethernet");
-    //         let eth = Eth::new(
-    //             dp.ETHERNET_MAC,
-    //             dp.ETHERNET_DMA,
-    //             &mut RX_RING.as_mut().unwrap()[..],
-    //             &mut TX_RING.as_mut().unwrap()[..],
-    //             PhyAddress::_0,
-    //             clocks,
-    //             eth_pins,
-    //         )
-    //         .unwrap();
-    //         info!("Created ethernet");
-    //         ETH = Some(eth);
-    //         ETH.as_mut().unwrap()
-    //     }
-    // };
+    let mut routes = Routes::new(&mut store.routes_cache[..]);
+    routes
+        // .add_default_ipv4_route(i)
+        .add_default_ipv4_route(Ipv4Address::UNSPECIFIED)
+        .unwrap();
 
-    // info!("Enabling ethernet interrupt");
-    // eth.enable_interrupt();
+    info!("Setup interface");
 
-    // let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
+    let ethernet_addr = EthernetAddress(SRC_MAC);
+    let interface = InterfaceBuilder::new(eth)
+        .ethernet_addr(ethernet_addr)
+        .ip_addrs(&mut store.ip_addrs[..])
+        .neighbor_cache(neighbor_cache)
+        .routes(routes)
+        .finalize();
 
-    // let neighbor_cache = smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);
+    info!("Setup sockets");
+    let sockets = {
+        let mut sockets = smoltcp::socket::SocketSet::new(&mut store.sockets[..]);
 
-    // // let i = match store.ip_addrs[0].address() {
-    // //     IpAddress::Ipv4(addr) => addr,
-    // //     _ => unreachable!(),
-    // // };
+        for storage in store.tcp_socket_storage[..].iter_mut() {
+            let tcp_socket = {
+                let rx_buffer = smoltcp::socket::TcpSocketBuffer::new(&mut storage.rx_storage[..]);
+                let tx_buffer = smoltcp::socket::TcpSocketBuffer::new(&mut storage.tx_storage[..]);
 
-    // let mut routes = Routes::new(&mut store.routes_cache[..]);
-    // routes
-    //     // .add_default_ipv4_route(i)
-    //     .add_default_ipv4_route(Ipv4Address::UNSPECIFIED)
-    //     .unwrap();
+                smoltcp::socket::TcpSocket::new(rx_buffer, tx_buffer)
+            };
+            sockets.add(tcp_socket);
+        }
+        for storage in store.udp_socket_storage[..].iter_mut() {
+            let udp_socket = {
+                let rx_buffer = smoltcp::socket::UdpSocketBuffer::new(
+                    &mut storage.rx_metadata[..],
+                    &mut storage.rx_storage[..],
+                );
+                let tx_buffer = smoltcp::socket::UdpSocketBuffer::new(
+                    &mut storage.tx_metadata[..],
+                    &mut storage.tx_storage[..],
+                );
 
-    // info!("Setup interface");
+                smoltcp::socket::UdpSocket::new(rx_buffer, tx_buffer)
+            };
+            sockets.add(udp_socket);
+        }
 
-    // let ethernet_addr = EthernetAddress(SRC_MAC);
-    // let interface = InterfaceBuilder::new(eth)
-    //     .ethernet_addr(ethernet_addr)
-    //     .ip_addrs(&mut store.ip_addrs[..])
-    //     .neighbor_cache(neighbor_cache)
-    //     .routes(routes)
-    //     .finalize();
+        sockets
+    };
 
-    // info!("Setup sockets");
-    // let sockets = {
-    //     let mut sockets = smoltcp::socket::SocketSet::new(&mut store.sockets[..]);
+    info!("Setup network stack");
+    let mut stack = smoltcp_nal::NetworkStack::new(interface, sockets);
 
-    //     for storage in store.tcp_socket_storage[..].iter_mut() {
-    //         let tcp_socket = {
-    //             let rx_buffer = smoltcp::socket::TcpSocketBuffer::new(&mut storage.rx_storage[..]);
-    //             let tx_buffer = smoltcp::socket::TcpSocketBuffer::new(&mut storage.tx_storage[..]);
-
-    //             smoltcp::socket::TcpSocket::new(rx_buffer, tx_buffer)
-    //         };
-    //         sockets.add(tcp_socket);
-    //     }
-    //     for storage in store.udp_socket_storage[..].iter_mut() {
-    //         let udp_socket = {
-    //             let rx_buffer = smoltcp::socket::UdpSocketBuffer::new(
-    //                 &mut storage.rx_metadata[..],
-    //                 &mut storage.rx_storage[..],
-    //             );
-    //             let tx_buffer = smoltcp::socket::UdpSocketBuffer::new(
-    //                 &mut storage.tx_metadata[..],
-    //                 &mut storage.tx_storage[..],
-    //             );
-
-    //             smoltcp::socket::UdpSocket::new(rx_buffer, tx_buffer)
-    //         };
-    //         sockets.add(udp_socket);
-    //     }
-
-    //     sockets
-    // };
-
-    // info!("Setup network stack");
-    // let mut stack = smoltcp_nal::NetworkStack::new(interface, sockets);
-
-    // let mut network_devices = NetworkDevices {
-    //     stack,
-    //     mac_address: ethernet_addr,
-    // };
+    let mut network_devices = NetworkDevices {
+        stack,
+        mac_address: ethernet_addr,
+    };
 
     let adc_pins = AdcPins {
         sck: gpiob.pb10.into_alternate_af5(),
@@ -319,22 +322,24 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     let _ = pwms.shdn1.set_high();
     pwms.set(0.5, 0);   // max_v0
     pwms.set(0.5, 1);   // max_v1
-    pwms.set(0.5, 2);   
-    pwms.set(0.5, 3);   
-    pwms.set(0.5, 4);   
-    pwms.set(0.5, 5);   
+    pwms.set(0.5, 2);   // max_i_pos0
+    pwms.set(0.5, 3);   // max_i_pos1
+    pwms.set(0.5, 4);   // max_i_neg0
+    pwms.set(0.5, 5);   // max_i_neg1
 
-    // TODO: second MAX channel
 
-    dacs.set(0x17fff, 0);
-    dacs.set(0x17fff, 1);
+    dacs.set(0x1ffff, 0);
+    dacs.set(0x1ffff, 1);
 
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
     
 
     let mut thermostat = Thermostat {
-        // network_devices,
+        network_devices,
         leds,
+        adc,
+        dacs,
+        pwms
     };
 
     thermostat
