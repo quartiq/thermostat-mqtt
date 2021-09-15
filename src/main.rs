@@ -57,7 +57,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             led: false,
-            dacs: [0, 0],
+            dacs: [1<<17, 1<<17],
             engage_iir: [false, false],
             iirs: [Iirsettings{
                 ba: [1.0, 0.0, 0.0, 0.0, 0.0],
