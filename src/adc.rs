@@ -85,11 +85,10 @@ impl Adc {
             spi,
             sync: pins.sync,
         };
-        
         adc.reset();
 
         let before = adc.read_reg(IFMODE, 2);
-        adc.write_reg(IFMODE, 2, before|0b100_0000);    // set DATA_STAT bit 
+        adc.write_reg(IFMODE, 2, before | 0b100_0000); // set DATA_STAT bit
         info!("ifmode con: {:#X}", adc.read_reg(IFMODE, 2));
 
         info!("filt con: {:#X}", adc.read_reg(FILTCON0, 2));
@@ -104,7 +103,6 @@ impl Adc {
 
         adc.write_reg(CH0, 2, 0x8001); // enable second channel
 
-
         // let before = adc.read_reg(FILTCON1, 2);
         // adc.write_reg(FILTCON1, 2, (before & 0xffe0) | 0x8); // set data rate CH1 to 1 kSPS
 
@@ -117,7 +115,6 @@ impl Adc {
         info!("filt con: {:#X}", adc.read_reg(FILTCON0, 2));
 
         // adc.print_continuous_conversion();
-
 
         adc
     }
@@ -138,7 +135,7 @@ impl Adc {
     }
 
     fn print_continuous_conversion(&mut self) {
-        let (mut data1, mut data2) = (0,0);
+        let (mut data1, mut data2) = (0, 0);
         loop {
             let mut statreg = 0xff;
             while statreg == 0xff {
@@ -146,12 +143,15 @@ impl Adc {
             }
 
             let (data, ch) = self.read_data();
-            if ch == 0{
+            if ch == 0 {
                 data1 = data;
-            } else{
+            } else {
                 data2 = data;
             }
-            info!("data, ch: {:#X}, {:?},   data2, ch2: {:#X}, {:?}", data1, ch, data2, ch);
+            info!(
+                "data, ch: {:#X}, {:?},   data2, ch2: {:#X}, {:?}",
+                data1, ch, data2, ch
+            );
         }
     }
 
@@ -226,46 +226,43 @@ impl Adc {
         /// Reads the data register and returns data and channel information.
         /// The DATA_STAT bit has to be set in the IFMODE register.
         let datach = self.read_reg(DATA, 4);
-        let ch = (datach&0x3) as u8;
+        let ch = (datach & 0x3) as u8;
         let data = datach >> 8;
         (data, ch)
     }
 
-    fn setup_channels(&mut self){
+    fn setup_channels(&mut self) {
         /// Setup ADC channels.
-        
         // enable first channel and configure Ain0, Ain1,
-        // set config 0 for second channel, 
-        self.write_reg(CH0, 2, 0x8001); 
+        // set config 0 for second channel,
+        self.write_reg(CH0, 2, 0x8001);
 
         // enable second channel and configure Ain2, Ain3,
-        // set config 1 for second channel, 
-        self.write_reg(CH1, 2, 0x9043); 
+        // set config 1 for second channel,
+        self.write_reg(CH1, 2, 0x9043);
 
         // Setup configuration register ch0
-        let rbp = 1<<11; // REFBUF+
-        let rbn = 1<<10; // REFBUF-
-        let abp = 1<<9; // AINBUF-
-        let abn = 1<<8; // AINBUF+
-        let unip = 0<<12; // BI_UNIPOLAR
-        let refsel = 00<<4; // REF_SEL
-        self.write_reg(SETUPCON0, 2, rbp|rbn|abp|abn|unip|refsel); 
+        let rbp = 1 << 11; // REFBUF+
+        let rbn = 1 << 10; // REFBUF-
+        let abp = 1 << 9; // AINBUF-
+        let abn = 1 << 8; // AINBUF+
+        let unip = 0 << 12; // BI_UNIPOLAR
+        let refsel = 00 << 4; // REF_SEL
+        self.write_reg(SETUPCON0, 2, rbp | rbn | abp | abn | unip | refsel);
 
         // Setup configuration register ch1
-        let rbp = 1<<11; // REFBUF+
-        let rbn = 1<<10; // REFBUF-
-        let abp = 1<<9; // AINBUF-
-        let abn = 1<<8; // AINBUF+
-        let unip = 0<<12; // BI_UNIPOLAR
-        let refsel = 00<<4; // REF_SEL
-        self.write_reg(SETUPCON1, 2, rbp|rbn|abp|abn|unip|refsel);
+        let rbp = 1 << 11; // REFBUF+
+        let rbn = 1 << 10; // REFBUF-
+        let abp = 1 << 9; // AINBUF-
+        let abn = 1 << 8; // AINBUF+
+        let unip = 0 << 12; // BI_UNIPOLAR
+        let refsel = 00 << 4; // REF_SEL
+        self.write_reg(SETUPCON1, 2, rbp | rbn | abp | abn | unip | refsel);
 
         // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(FILTCON0, 2, 0b110<<8|1<<11|0b10011);
-        
+        self.write_reg(FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+
         // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(FILTCON1, 2, 0b110<<8|1<<11|0b10011);
-
+        self.write_reg(FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
     }
-
 }

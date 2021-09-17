@@ -48,8 +48,6 @@ pub struct TelemetryClient<T: Serialize> {
 /// overhead.
 #[derive(Serialize)]
 pub struct Telemetry {
-    /// status of led
-    pub led: bool,
     pub adc: [u32; 2],
     pub dac: [u32; 2],
 }
@@ -57,7 +55,6 @@ pub struct Telemetry {
 impl Default for Telemetry {
     fn default() -> Self {
         Self {
-            led: false,
             adc: [0, 0],
             dac: [0x20000, 0x20000],
         }

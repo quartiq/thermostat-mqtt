@@ -1,25 +1,25 @@
 #![no_std]
 #![no_main]
 
+use cortex_m::asm::delay;
 use log::{error, info, warn};
 use panic_halt as _;
-use cortex_m::asm::delay;
 
 mod network_users;
 mod telemetry;
 use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::Telemetry;
 
-mod leds;
 mod adc;
 mod dac;
-mod setup;
 mod iir;
+mod leds;
+mod setup;
 
-use leds::Leds;
 use adc::Adc;
 use dac::{Dacs, Pwms};
 use iir::Iirs;
+use leds::Leds;
 
 use stm32_eth;
 
@@ -27,7 +27,7 @@ use stm32_eth::stm32::Peripherals;
 
 use rtic::cyccnt::{Instant, U32Ext as _};
 
-use smoltcp_nal::smoltcp;
+// use smoltcp_nal::smoltcp;
 
 // pub mod messages;
 // pub mod miniconf_client;
@@ -38,6 +38,7 @@ pub use miniconf::{Miniconf, MiniconfAtomic};
 pub use serde::Deserialize;
 
 const PERIOD: u32 = 1 << 25;
+const CYC_PER_S: u32 = 168_000_000;   // clock is 168MHz
 
 #[derive(Copy, Clone, Debug, Deserialize, MiniconfAtomic)]
 pub struct Iirsettings {
@@ -47,26 +48,30 @@ pub struct Iirsettings {
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct Settings {
+    telemetry_period: f64,
     led: bool,
     dacs: [u32; 2],
     engage_iir: [bool; 2],
-    iirs: [Iirsettings; 2]
+    iirs: [Iirsettings; 2],
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            telemetry_period: 1.0,
             led: false,
-            dacs: [1<<17, 1<<17],
+            dacs: [1 << 17, 1 << 17],
             engage_iir: [false, false],
-            iirs: [Iirsettings{
-                ba: [1.0, 0.0, 0.0, 0.0, 0.0],
-                target: 8300000.0
-            },
-            Iirsettings{
-                ba: [1.0, 0.0, 0.0, 0.0, 0.0],
-                target: 8300000.0
-            }]
+            iirs: [
+                Iirsettings {
+                    ba: [1.0, 0.0, 0.0, 0.0, 0.0],
+                    target: 8300000.0,
+                },
+                Iirsettings {
+                    ba: [1.0, 0.0, 0.0, 0.0, 0.0],
+                    target: 8300000.0,
+                },
+            ],
         }
     }
 }
@@ -85,13 +90,13 @@ const APP: () = {
     }
 
     // #[init(schedule = [blink, poll_eth])]
-    #[init(schedule = [blink, poll_eth, process])]
+    #[init(schedule = [blink, poll_eth, process, tele])]
     fn init(c: init::Context) -> init::LateResources {
         let mut thermostat = setup::setup(c.core, c.device);
 
         log::info!("setup done");
 
-        let mut network = NetworkUsers::new(
+        let network = NetworkUsers::new(
             thermostat.network_devices.stack,
             env!("CARGO_BIN_NAME"),
             thermostat.network_devices.mac_address,
@@ -109,6 +114,7 @@ const APP: () = {
 
         c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
         c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
+        c.schedule.tele(c.start + CYC_PER_S.cycles()).unwrap();
 
         thermostat.dacs.set(settings.dacs[0], 0);
         thermostat.dacs.set(settings.dacs[1], 1);
@@ -127,7 +133,7 @@ const APP: () = {
     }
 
     #[task(priority=1, resources=[dacs, iirs, telemetry, settings], schedule = [process])]
-    fn process(mut c: process::Context, adcdata0: u32, adcdata1: u32) {
+    fn process(c: process::Context, adcdata0: u32, adcdata1: u32) {
         let dacs = c.resources.dacs;
         let iirs = c.resources.iirs;
         let telemetry = c.resources.telemetry;
@@ -137,9 +143,8 @@ const APP: () = {
         let yf1 = iirs.iir1.tick(adcdata1 as f64);
 
         // convert to 18 bit fullscale output from 24 bit fullscale float equivalent
-        let yo0 = ((yf0 + 8388608.0) as u32)>>6;  
-        let yo1 = ((yf1 + 8388608.0) as u32)>>6;  
-        info!("{:?}, {:?}", yf1, yo1);
+        let yo0 = ((yf0 + 8388608.0) as u32) >> 6;
+        let yo1 = ((yf1 + 8388608.0) as u32) >> 6;
 
         if settings.engage_iir[0] {
             dacs.set(yo0, 0);
@@ -190,16 +195,18 @@ const APP: () = {
     }
 
     #[idle(resources=[adc], spawn=[process])]
-    fn idle(mut c: idle::Context) -> ! {
+    fn idle(c: idle::Context) -> ! {
         let (mut adcdata0, mut adcdata1) = (0, 0);
         loop {
             let statreg = c.resources.adc.get_status_reg();
             if statreg != 0xff {
                 let (adcdata, ch) = c.resources.adc.read_data();
-                match ch{
-                    0 => {adcdata1 = adcdata;}  // ADC ch1 is thermostat ch0 for unknown reasons
+                match ch {
+                    0 => {
+                        adcdata1 = adcdata;
+                    } // ADC ch1 is thermostat ch0 for unknown reasons
                     _ => {
-                        adcdata0 = adcdata;     // ADC ch1 is thermostat ch0 for unknown reasons
+                        adcdata0 = adcdata;
                         c.spawn.process(adcdata0, adcdata1).unwrap();
                     }
                 }
@@ -207,33 +214,28 @@ const APP: () = {
         }
     }
 
-    #[task(priority = 1, resources = [leds, network, telemetry, settings], schedule = [blink])]
-    fn blink(c: blink::Context) {
-        static mut LED_STATE: bool = false;
-
-        if *LED_STATE {
-            c.resources.leds.g3.off();
-            *LED_STATE = false;
-            log::info!("led off");
-        } else {
-            c.resources.leds.g3.on();
-            *LED_STATE = true;
-            log::info!("led on");
-        }
-        c.resources.telemetry.led = c.resources.settings.led;
-
-        if c.resources.telemetry.led {
-            c.resources.leds.g4.on();
-        } else {
-            c.resources.leds.g4.off();
-        }
-
+    #[task(priority = 1, resources = [network, telemetry, settings], schedule = [tele])]
+    fn tele(c: tele::Context) {
         c.resources.network.telemetry.update();
-
         c.resources
             .network
             .telemetry
             .publish(&c.resources.telemetry);
+        
+        c.schedule.tele(c.scheduled + ((c.resources.settings.telemetry_period * CYC_PER_S as f64) as u32).cycles()).unwrap();
+    }
+
+    #[task(priority = 1, resources = [leds], schedule = [blink])]
+    fn blink(c: blink::Context) {
+        static mut LED_STATE: bool = false;
+        if *LED_STATE {
+            c.resources.leds.g3.off();
+            *LED_STATE = false;
+        } else {
+            c.resources.leds.g3.on();
+            *LED_STATE = true;
+        }
+
         c.schedule.blink(c.scheduled + PERIOD.cycles()).unwrap();
     }
 
