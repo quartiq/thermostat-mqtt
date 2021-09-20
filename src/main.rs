@@ -47,9 +47,18 @@ pub struct Iirsettings {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
-pub struct Adcsettings {
-    pub data_rate_setting: u32,
-    pub filter_setting: u32,
+pub struct AdcFilterSettings {
+    pub odr: u32,
+    pub order: u32,
+    pub enhfilt: u32,
+    pub enhfilten: u32,
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
+pub struct DacSettings {
+    pub max_i: u32,
+    pub min_i: u32,
+    pub max_v: u32,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
@@ -59,6 +68,7 @@ pub struct Settings {
     dacs: [u32; 2],
     engage_iir: [bool; 2],
     iirs: [Iirsettings; 2],
+    adcsettings: AdcFilterSettings,
 }
 
 impl Default for Settings {
@@ -78,6 +88,12 @@ impl Default for Settings {
                     target: 8300000.0,
                 },
             ],
+            adcsettings: AdcFilterSettings {
+                odr: 0b10000,   // 10Hz output data rate
+                order: 0,       // Sinc5+Sinc1 filter
+                enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
+                enhfilten: 1,   // enable postfilter
+            },
         }
     }
 }
@@ -122,8 +138,10 @@ const APP: () = {
         c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
         c.schedule.tele(c.start + CYC_PER_S.cycles()).unwrap();
 
+        // apply default settings
         thermostat.dacs.set(settings.dacs[0], 0);
         thermostat.dacs.set(settings.dacs[1], 1);
+        thermostat.adc.set_filters(settings.adcsettings);
 
         log::info!("init done");
         init::LateResources {
@@ -140,6 +158,7 @@ const APP: () = {
 
     #[task(priority=1, resources=[dacs, iirs, telemetry, settings], schedule = [process])]
     fn process(c: process::Context, adcdata0: u32, adcdata1: u32) {
+        info!("adcdata:\t {:?}\t {:?}", adcdata0, adcdata1);
         let dacs = c.resources.dacs;
         let iirs = c.resources.iirs;
         let telemetry = c.resources.telemetry;
@@ -163,7 +182,7 @@ const APP: () = {
         telemetry.adc = [adcdata0, adcdata1];
     }
 
-    #[task(priority = 1, resources=[network, settings, iirs, dacs])]
+    #[task(priority = 1, resources=[network, settings, iirs, dacs, adc])]
     fn settings_update(c: settings_update::Context) {
         log::info!("updating settings");
         let settings = c.resources.network.miniconf.settings();
@@ -176,12 +195,15 @@ const APP: () = {
         c.resources.iirs.iir1.ba = c.resources.settings.iirs[1].ba;
         c.resources.iirs.iir1.target = c.resources.settings.iirs[1].target;
 
+        c.resources
+            .adc
+            .set_filters(c.resources.settings.adcsettings);
+
         if !c.resources.settings.engage_iir[0] {
             c.resources.dacs.set(c.resources.settings.dacs[0], 0);
         }
         if !c.resources.settings.engage_iir[1] {
             c.resources.dacs.set(c.resources.settings.dacs[1], 1);
-            log::info!("set dac1: {:?}", c.resources.settings.dacs[1]);
         }
     }
 
@@ -201,12 +223,14 @@ const APP: () = {
     }
 
     #[idle(resources=[adc], spawn=[process])]
-    fn idle(c: idle::Context) -> ! {
+    fn idle(mut c: idle::Context) -> ! {
         let (mut adcdata0, mut adcdata1) = (0, 0);
         loop {
-            let statreg = c.resources.adc.get_status_reg();
+            let statreg = c.resources.adc.lock(|adc| adc.get_status_reg());
+            // info!("statreg:\t {:b}", statreg);
             if statreg != 0xff {
-                let (adcdata, ch) = c.resources.adc.read_data();
+                info!("statreg:\t {:b}", statreg);
+                let (adcdata, ch) = c.resources.adc.lock(|adc| adc.read_data());
                 match ch {
                     0 => {
                         adcdata1 = adcdata;

@@ -16,6 +16,8 @@ use stm32_eth::hal::{
     time::MegaHertz,
 };
 
+use crate::AdcFilterSettings;
+
 /// SPI Mode 3
 pub const SPI_MODE: spi::Mode = spi::Mode {
     polarity: spi::Polarity::IdleHigh,
@@ -225,5 +227,14 @@ impl Adc {
 
         // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
         self.write_reg(FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+    }
+
+    pub fn set_filters(&mut self, set: AdcFilterSettings) {
+        /// Set both ADC channel filter config to the same settings.
+        let reg: u32 = (set.odr | set.order << 4 | set.enhfilt << 7 | set.enhfilten << 10) as u32;
+        // info!("reg:\t {:b}", reg);
+        self.write_reg(FILTCON0, 2, reg);
+        self.write_reg(FILTCON1, 2, reg);
+        info!("reg:\t {:b}", self.read_reg(FILTCON0, 2));
     }
 }
