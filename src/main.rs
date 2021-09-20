@@ -47,6 +47,12 @@ pub struct Iirsettings {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
+pub struct Adcsettings {
+    pub data_rate_setting: u32,
+    pub filter_setting: u32,
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct Settings {
     telemetry_period: f64,
     led: bool,

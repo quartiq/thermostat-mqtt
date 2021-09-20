@@ -31,24 +31,24 @@ const IFMODE: u8 = 0x2;
 const DATA: u8 = 0x04;
 const FILTCON0: u8 = 0x28;
 const FILTCON1: u8 = 0x29;
-const FILTCON2: u8 = 0x2a;
-const FILTCON3: u8 = 0x2b;
+// const FILTCON2: u8 = 0x2a;
+// const FILTCON3: u8 = 0x2b;
 const CH0: u8 = 0x10;
 const CH1: u8 = 0x11;
-const CH2: u8 = 0x12;
-const CH3: u8 = 0x13;
+// const CH2: u8 = 0x12;
+// const CH3: u8 = 0x13;
 const SETUPCON0: u8 = 0x20;
 const SETUPCON1: u8 = 0x21;
-const SETUPCON2: u8 = 0x22;
-const SETUPCON3: u8 = 0x23;
-const OFFSET0: u8 = 0x30;
-const OFFSET1: u8 = 0x31;
-const OFFSET2: u8 = 0x32;
-const OFFSET3: u8 = 0x33;
-const GAIN0: u8 = 0x38;
-const GAIN1: u8 = 0x39;
-const GAIN2: u8 = 0x3a;
-const GAIN3: u8 = 0x3b;
+// const SETUPCON2: u8 = 0x22;
+// const SETUPCON3: u8 = 0x23;
+// const OFFSET0: u8 = 0x30;
+// const OFFSET1: u8 = 0x31;
+// const OFFSET2: u8 = 0x32;
+// const OFFSET3: u8 = 0x33;
+// const GAIN0: u8 = 0x38;
+// const GAIN1: u8 = 0x39;
+// const GAIN2: u8 = 0x3a;
+// const GAIN3: u8 = 0x3b;
 
 pub type AdcSpi = Spi<
     SPI2,
@@ -73,7 +73,7 @@ pub struct Adc {
 
 impl Adc {
     pub fn new(clocks: Clocks, spi2: SPI2, mut pins: AdcPins) -> Self {
-        pins.sync.set_high();
+        let _ = pins.sync.set_high();
         let spi = Spi::spi2(
             spi2,
             (pins.sck, pins.miso, pins.mosi),
@@ -89,32 +89,8 @@ impl Adc {
 
         let before = adc.read_reg(IFMODE, 2);
         adc.write_reg(IFMODE, 2, before | 0b100_0000); // set DATA_STAT bit
-        info!("ifmode con: {:#X}", adc.read_reg(IFMODE, 2));
-
-        info!("filt con: {:#X}", adc.read_reg(FILTCON0, 2));
-
-        let before = adc.read_reg(FILTCON0, 2);
-        adc.write_reg(FILTCON0, 2, (before & 0xffe0) | 0x8); // set data rate CH0 to 1 kSPS
-
-        info!("ch1: {:#X}", adc.read_reg(CH1, 2));
-        info!("ch0: {:#X}", adc.read_reg(CH0, 2));
-
-        adc.write_reg(CH1, 2, 0x8043); // enable second channel and configure Ain2, Ain3
-
-        adc.write_reg(CH0, 2, 0x8001); // enable second channel
-
-        // let before = adc.read_reg(FILTCON1, 2);
-        // adc.write_reg(FILTCON1, 2, (before & 0xffe0) | 0x8); // set data rate CH1 to 1 kSPS
 
         adc.setup_channels();
-
-        info!("ch0: {:#X}", adc.read_reg(CH0, 2));
-        info!("ch0: {:#X}", adc.read_reg(CH0, 2));
-        info!("ch1: {:#X}", adc.read_reg(CH1, 2));
-
-        info!("filt con: {:#X}", adc.read_reg(FILTCON0, 2));
-
-        // adc.print_continuous_conversion();
 
         adc
     }
@@ -132,27 +108,6 @@ impl Adc {
                 info!("ADC reset succeeded")
             }
         };
-    }
-
-    fn print_continuous_conversion(&mut self) {
-        let (mut data1, mut data2) = (0, 0);
-        loop {
-            let mut statreg = 0xff;
-            while statreg == 0xff {
-                statreg = self.get_status_reg();
-            }
-
-            let (data, ch) = self.read_data();
-            if ch == 0 {
-                data1 = data;
-            } else {
-                data2 = data;
-            }
-            info!(
-                "data, ch: {:#X}, {:?},   data2, ch2: {:#X}, {:?}",
-                data1, ch, data2, ch
-            );
-        }
     }
 
     fn read_reg(&mut self, addr: u8, size: u8) -> u32 {
@@ -210,8 +165,9 @@ impl Adc {
                 BigEndian::write_u32(&mut buf, data as u32);
                 let _ = self.spi.transfer(&mut buf);
             }
-            _ => {}
+            _ => {}        
         };
+        let _ = self.sync.set_high();
     }
 
     pub fn get_status_reg(&mut self) -> u8 {
