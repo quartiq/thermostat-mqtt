@@ -38,7 +38,7 @@ pub use miniconf::{Miniconf, MiniconfAtomic};
 pub use serde::Deserialize;
 
 const PERIOD: u32 = 1 << 25;
-const CYC_PER_S: u32 = 168_000_000;   // clock is 168MHz
+const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
 
 #[derive(Copy, Clone, Debug, Deserialize, MiniconfAtomic)]
 pub struct Iirsettings {
@@ -227,8 +227,13 @@ const APP: () = {
             .network
             .telemetry
             .publish(&c.resources.telemetry);
-        
-        c.schedule.tele(c.scheduled + ((c.resources.settings.telemetry_period * CYC_PER_S as f64) as u32).cycles()).unwrap();
+
+        c.schedule
+            .tele(
+                c.scheduled
+                    + ((c.resources.settings.telemetry_period * CYC_PER_S as f64) as u32).cycles(),
+            )
+            .unwrap();
     }
 
     #[task(priority = 1, resources = [leds], schedule = [blink])]

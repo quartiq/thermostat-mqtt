@@ -87,8 +87,13 @@ impl Adc {
         };
         adc.reset();
 
-        let before = adc.read_reg(IFMODE, 2);
-        adc.write_reg(IFMODE, 2, before | 0b100_0000); // set DATA_STAT bit
+        info!("ADC ID: {:#X}", adc.read_reg(ID, 2));
+
+        // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
+        adc.write_reg(ADCMODE, 2, 0x8000);
+
+        // Setup IFMODE register. Only enable data stat to get channel info on conversions.
+        adc.write_reg(IFMODE, 2, 0b100_0000);
 
         adc.setup_channels();
 
@@ -165,7 +170,7 @@ impl Adc {
                 BigEndian::write_u32(&mut buf, data as u32);
                 let _ = self.spi.transfer(&mut buf);
             }
-            _ => {}        
+            _ => {}
         };
         let _ = self.sync.set_high();
     }
