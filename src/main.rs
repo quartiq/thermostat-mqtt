@@ -7,8 +7,10 @@ use panic_halt as _;
 
 mod network_users;
 mod telemetry;
+mod unit_conversion;
 use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::Telemetry;
+use unit_conversion::{adc_to_temp, i_to_dac, i_to_pwm, pid_to_iir, temp_to_iiroffset};
 
 mod adc;
 mod dac;
@@ -27,15 +29,11 @@ use stm32_eth::stm32::Peripherals;
 
 use rtic::cyccnt::{Instant, U32Ext as _};
 
-// use smoltcp_nal::smoltcp;
-
-// pub mod messages;
-// pub mod miniconf_client;
 pub mod shared;
-// pub mod configuration;
 
 pub use miniconf::{Miniconf, MiniconfAtomic};
 pub use serde::Deserialize;
+pub use num_traits;
 
 const PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
@@ -55,10 +53,10 @@ pub struct AdcFilterSettings {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
-pub struct DacSettings {
-    pub max_i: u32,
-    pub min_i: u32,
-    pub max_v: u32,
+pub struct PwmSettings {
+    pub max_i_pos: f64,
+    pub max_i_neg: f64,
+    pub max_v: f64,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
@@ -69,6 +67,7 @@ pub struct Settings {
     engage_iir: [bool; 2],
     iirs: [Iirsettings; 2],
     adcsettings: AdcFilterSettings,
+    pwmsettings: [PwmSettings; 2],
 }
 
 impl Default for Settings {
@@ -94,6 +93,18 @@ impl Default for Settings {
                 enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
                 enhfilten: 1,   // enable postfilter
             },
+            pwmsettings: [
+                PwmSettings {
+                    max_i_pos: 0.1,
+                    max_i_neg: 0.1,
+                    max_v: 0.1,
+                },
+                PwmSettings {
+                    max_i_pos: 0.1,
+                    max_i_neg: 0.1,
+                    max_v: 0.1,
+                },
+            ],
         }
     }
 }
@@ -179,17 +190,17 @@ const APP: () = {
         }
         telemetry.dac[0] = dacs.val0;
         telemetry.dac[1] = dacs.val1;
-        telemetry.adc = [adcdata0, adcdata1];
+        telemetry.adc = [adc_to_temp(adcdata0), adc_to_temp(adcdata1)];
     }
 
-    #[task(priority = 1, resources=[network, settings, iirs, dacs, adc])]
+    #[task(priority = 1, resources=[network, settings, iirs, dacs, adc, pwms])]
     fn settings_update(c: settings_update::Context) {
         log::info!("updating settings");
         let settings = c.resources.network.miniconf.settings();
 
-        // c.resources.settings.lock(|current| *current = *settings);
         *c.resources.settings = *settings;
 
+        // apply settings
         c.resources.iirs.iir0.ba = c.resources.settings.iirs[0].ba;
         c.resources.iirs.iir0.target = c.resources.settings.iirs[0].target;
         c.resources.iirs.iir1.ba = c.resources.settings.iirs[1].ba;
@@ -198,6 +209,11 @@ const APP: () = {
         c.resources
             .adc
             .set_filters(c.resources.settings.adcsettings);
+
+        c.resources.pwms.set_all(
+            c.resources.settings.pwmsettings[0],
+            c.resources.settings.pwmsettings[1],
+        );
 
         if !c.resources.settings.engage_iir[0] {
             c.resources.dacs.set(c.resources.settings.dacs[0], 0);
@@ -227,9 +243,7 @@ const APP: () = {
         let (mut adcdata0, mut adcdata1) = (0, 0);
         loop {
             let statreg = c.resources.adc.lock(|adc| adc.get_status_reg());
-            // info!("statreg:\t {:b}", statreg);
             if statreg != 0xff {
-                info!("statreg:\t {:b}", statreg);
                 let (adcdata, ch) = c.resources.adc.lock(|adc| adc.read_data());
                 match ch {
                     0 => {
