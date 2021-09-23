@@ -10,7 +10,7 @@ mod telemetry;
 mod unit_conversion;
 use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::Telemetry;
-use unit_conversion::{adc_to_temp, i_to_dac, i_to_pwm, pid_to_iir, temp_to_iiroffset};
+use unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, i_to_pwm, pid_to_iir, temp_to_iiroffset};
 
 mod adc;
 mod dac;
@@ -32,8 +32,8 @@ use rtic::cyccnt::{Instant, U32Ext as _};
 pub mod shared;
 
 pub use miniconf::{Miniconf, MiniconfAtomic};
-pub use serde::Deserialize;
 pub use num_traits;
+pub use serde::Deserialize;
 
 const PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
@@ -63,7 +63,7 @@ pub struct PwmSettings {
 pub struct Settings {
     telemetry_period: f64,
     led: bool,
-    dacs: [u32; 2],
+    dacs: [f64; 2],
     engage_iir: [bool; 2],
     iirs: [Iirsettings; 2],
     adcsettings: AdcFilterSettings,
@@ -75,7 +75,7 @@ impl Default for Settings {
         Self {
             telemetry_period: 1.0,
             led: false,
-            dacs: [1 << 17, 1 << 17],
+            dacs: [0.0, 0.0],
             engage_iir: [false, false],
             iirs: [
                 Iirsettings {
@@ -95,14 +95,14 @@ impl Default for Settings {
             },
             pwmsettings: [
                 PwmSettings {
-                    max_i_pos: 0.1,
-                    max_i_neg: 0.1,
-                    max_v: 0.1,
+                    max_i_pos: 0.5,
+                    max_i_neg: 0.5,
+                    max_v: 0.5,
                 },
                 PwmSettings {
-                    max_i_pos: 0.1,
-                    max_i_neg: 0.1,
-                    max_v: 0.1,
+                    max_i_pos: 0.5,
+                    max_i_neg: 0.5,
+                    max_v: 0.5,
                 },
             ],
         }
@@ -150,9 +150,12 @@ const APP: () = {
         c.schedule.tele(c.start + CYC_PER_S.cycles()).unwrap();
 
         // apply default settings
-        thermostat.dacs.set(settings.dacs[0], 0);
-        thermostat.dacs.set(settings.dacs[1], 1);
+        thermostat.dacs.set(i_to_dac(settings.dacs[1]), 1);
+        thermostat.dacs.set(i_to_dac(settings.dacs[0]), 0);
         thermostat.adc.set_filters(settings.adcsettings);
+        thermostat
+            .pwms
+            .set_all(settings.pwmsettings[0], settings.pwmsettings[1]);
 
         log::info!("init done");
         init::LateResources {
@@ -188,8 +191,10 @@ const APP: () = {
         if settings.engage_iir[1] {
             dacs.set(yo1, 1);
         }
-        telemetry.dac[0] = dacs.val0;
-        telemetry.dac[1] = dacs.val1;
+
+        // TODO: move this to the tele process
+        telemetry.dac[0] = dac_to_i(dacs.val0);
+        telemetry.dac[1] = dac_to_i(dacs.val1);
         telemetry.adc = [adc_to_temp(adcdata0), adc_to_temp(adcdata1)];
     }
 
@@ -214,12 +219,21 @@ const APP: () = {
             c.resources.settings.pwmsettings[0],
             c.resources.settings.pwmsettings[1],
         );
+        log::info!(
+            "{:?} /t {:?}",
+            c.resources.settings.dacs[0],
+            i_to_dac(c.resources.settings.dacs[0])
+        );
 
         if !c.resources.settings.engage_iir[0] {
-            c.resources.dacs.set(c.resources.settings.dacs[0], 0);
+            c.resources
+                .dacs
+                .set(i_to_dac(c.resources.settings.dacs[0]), 0);
         }
         if !c.resources.settings.engage_iir[1] {
-            c.resources.dacs.set(c.resources.settings.dacs[1], 1);
+            c.resources
+                .dacs
+                .set(i_to_dac(c.resources.settings.dacs[1]), 1);
         }
     }
 

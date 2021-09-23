@@ -20,6 +20,7 @@ use stm32_eth::hal::{
     time::{MegaHertz, U32Ext},
 };
 
+use crate::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
 use crate::PwmSettings;
 
 /// SPI Mode 1
@@ -111,19 +112,20 @@ impl Pwms {
         }
     }
 
-    pub fn set(&mut self, duty: f64, ch: u8) {
+    pub fn set(&mut self, val: f64, ch: u8) {
         fn set<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f64) {
+            let duty = i_to_pwm(duty);
             let max = pin.get_max_duty();
             let value = ((duty * (max as f64)) as u16).min(max);
             pin.set_duty(value);
         }
         match ch {
-            0 => set(&mut self.max_v0, duty),
-            1 => set(&mut self.max_v1, duty),
-            2 => set(&mut self.max_i_pos0, duty),
-            3 => set(&mut self.max_i_pos1, duty),
-            4 => set(&mut self.max_i_neg0, duty),
-            5 => set(&mut self.max_i_neg1, duty),
+            0 => set(&mut self.max_v0, v_to_pwm(val)),
+            1 => set(&mut self.max_v1, v_to_pwm(val)),
+            2 => set(&mut self.max_i_pos0, i_to_pwm(val)),
+            4 => set(&mut self.max_i_neg0, i_to_pwm(val)),
+            3 => set(&mut self.max_i_pos1, i_to_pwm(val)),
+            5 => set(&mut self.max_i_neg1, i_to_pwm(val)),
             _ => unreachable!(),
         }
     }
@@ -138,6 +140,8 @@ impl Pwms {
     }
 }
 
+/// DAC: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
+/// Peltier Driver: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 pub struct Dacs {
     spi0: Dac0Spi,
     sync0: PE4<Output<PushPull>>,
