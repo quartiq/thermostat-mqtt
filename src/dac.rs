@@ -112,11 +112,11 @@ impl Pwms {
         }
     }
 
-    pub fn set(&mut self, val: f64, ch: u8) {
-        fn set<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f64) {
+    pub fn set(&mut self, val: f32, ch: u8) {
+        fn set<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
             let duty = i_to_pwm(duty);
             let max = pin.get_max_duty();
-            let value = ((duty * (max as f64)) as u16).min(max);
+            let value = ((duty * (max as f32)) as u16).min(max);
             pin.set_duty(value);
         }
         match ch {

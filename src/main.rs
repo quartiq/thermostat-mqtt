@@ -10,7 +10,7 @@ mod telemetry;
 mod unit_conversion;
 use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::Telemetry;
-use unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, i_to_pwm, pid_to_iir, temp_to_iiroffset};
+use unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset};
 
 mod adc;
 mod dac;
@@ -38,12 +38,14 @@ pub use serde::Deserialize;
 const IIR_CASCADE_LENGTH: usize = 1;
 const LED_PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
-const SCALE: f32 = 16777216.0;
+const SCALE: f32 = 8388608.0;
 
-#[derive(Copy, Clone, Debug, Deserialize, MiniconfAtomic)]
-pub struct Iirsettings {
-    pub ba: [f64; 5],
-    pub target: f64,
+#[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
+pub struct PidSettings {
+    pub pid: [f32; 3],
+    pub target: f32,
+    pub min: f32,
+    pub max: f32,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
@@ -56,18 +58,18 @@ pub struct AdcFilterSettings {
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct PwmSettings {
-    pub max_i_pos: f64,
-    pub max_i_neg: f64,
-    pub max_v: f64,
+    pub max_i_pos: f32,
+    pub max_i_neg: f32,
+    pub max_v: f32,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct Settings {
-    telemetry_period: f64,
+    telemetry_period: f32,
     led: bool,
-    dacs: [f64; 2],
+    dacs: [f32; 2],
+    pidsettings: [PidSettings; 2],
     engage_iir: [bool; 2],
-    iirs: [[iir::IIR; IIR_CASCADE_LENGTH]; 2],
     adcsettings: AdcFilterSettings,
     pwmsettings: [PwmSettings; 2],
 }
@@ -79,7 +81,6 @@ impl Default for Settings {
             led: false,
             dacs: [0.0, 0.0],
             engage_iir: [false, false],
-            iirs: [[iir::IIR::new(1., -SCALE, SCALE); IIR_CASCADE_LENGTH]; 2],
             adcsettings: AdcFilterSettings {
                 odr: 0b10000,   // 10Hz output data rate
                 order: 0,       // Sinc5+Sinc1 filter
@@ -98,6 +99,20 @@ impl Default for Settings {
                     max_v: 0.5,
                 },
             ],
+            pidsettings: [
+                PidSettings {
+                    pid: [1.0, 0., 0.],
+                    target: 22.0,
+                    min: -SCALE,
+                    max: SCALE,
+                },
+                PidSettings {
+                    pid: [1.0, 0., 0.],
+                    target: 22.0,
+                    min: -SCALE,
+                    max: SCALE,
+                },
+            ],
         }
     }
 }
@@ -109,6 +124,7 @@ const APP: () = {
         adc: Adc,
         dacs: Dacs,
         pwms: Pwms,
+        iirs: [[iir::IIR; IIR_CASCADE_LENGTH]; 2],
         #[init([[[0.; 5]; IIR_CASCADE_LENGTH]; 2])]
         iir_state: [[iir::Vec5; IIR_CASCADE_LENGTH]; 2],
         network: NetworkUsers<Settings, Telemetry>,
@@ -155,24 +171,26 @@ const APP: () = {
             adc: thermostat.adc,
             dacs: thermostat.dacs,
             pwms: thermostat.pwms,
+            iirs: [[iir::IIR::new(1., -SCALE, SCALE); IIR_CASCADE_LENGTH]; 2],
             network,
             settings,
             telemetry: Telemetry::default(),
         }
     }
 
-    #[task(priority=1, resources=[dacs, iir_state, telemetry, settings], schedule = [process])]
+    #[task(priority=1, resources=[dacs, iir_state, iirs, telemetry, settings], schedule = [process])]
     fn process(c: process::Context, adcdata: [u32; 2]) {
         info!("adcdata:\t {:?}\t {:?}", adcdata[0], adcdata[1]);
         let dacs = c.resources.dacs;
         let iir_state = c.resources.iir_state;
+        let iirs = c.resources.iirs;
         let telemetry = c.resources.telemetry;
         let settings = c.resources.settings;
 
         let mut yf: [f32; 2] = [0., 0.];
 
         for ch in 0..adcdata.len() {
-            let y = settings.iirs[ch]
+            let y = iirs[ch]
                 .iter()
                 .zip(iir_state[ch].iter_mut())
                 .fold(adcdata[ch] as f32, |yi, (iir_ch, state)| {
@@ -193,13 +211,19 @@ const APP: () = {
         }
 
         // TODO: move this to the tele process
-        // Wie geht das??: telemetry.dac = yf.iter().map(|x| i_to_dac(*x as f64) as f32).collect();
+        // Wie geht das??: telemetry.dac = yf.iter().map(|x| i_to_dac(*x as f32) as f32).collect();
         telemetry.dac[0] = dac_to_i(dacs.val0);
         telemetry.dac[1] = dac_to_i(dacs.val1);
         telemetry.adc = [adc_to_temp(adcdata[0]), adc_to_temp(adcdata[1])];
+
+        info!(
+            "adcdata:\t {:?}\t {:?}",
+            adc_to_temp(adcdata[0]),
+            temp_to_iiroffset(adc_to_temp(adcdata[0]))
+        );
     }
 
-    #[task(priority = 1, resources=[network, settings, dacs, adc, pwms])]
+    #[task(priority = 1, resources=[network, settings, dacs, adc, pwms, iirs])]
     fn settings_update(c: settings_update::Context) {
         log::info!("updating settings");
         let settings = c.resources.network.miniconf.settings();
@@ -214,11 +238,13 @@ const APP: () = {
             c.resources.settings.pwmsettings[0],
             c.resources.settings.pwmsettings[1],
         );
-        log::info!(
-            "{:?} /t {:?}",
-            c.resources.settings.dacs[0],
-            i_to_dac(c.resources.settings.dacs[0])
-        );
+        // log::info!(
+        //     "{:?} /t {:?}",
+        //     c.resources.settings.dacs[0],
+        //     i_to_dac(c.resources.settings.dacs[0])
+        // );
+
+        c.resources.iirs[0][0].ba = pid_to_iir(c.resources.settings.pidsettings[0].pid);
 
         if !c.resources.settings.engage_iir[0] {
             c.resources
@@ -244,7 +270,6 @@ const APP: () = {
         }
         *NOW = *NOW + 1;
         c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
-        // log::info!("poll eth done");
     }
 
     #[idle(resources=[adc], spawn=[process])]
@@ -278,7 +303,7 @@ const APP: () = {
         c.schedule
             .tele(
                 c.scheduled
-                    + ((c.resources.settings.telemetry_period * CYC_PER_S as f64) as u32).cycles(),
+                    + ((c.resources.settings.telemetry_period * CYC_PER_S as f32) as u32).cycles(),
             )
             .unwrap();
     }
