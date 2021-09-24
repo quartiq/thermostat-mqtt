@@ -14,13 +14,12 @@ use unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, i_to_pwm, pid_to_iir, tem
 
 mod adc;
 mod dac;
-mod iir;
 mod leds;
 mod setup;
 
 use adc::Adc;
 use dac::{Dacs, Pwms};
-use iir::Iirs;
+use idsp::iir;
 use leds::Leds;
 
 use stm32_eth;
@@ -35,8 +34,11 @@ pub use miniconf::{Miniconf, MiniconfAtomic};
 pub use num_traits;
 pub use serde::Deserialize;
 
-const PERIOD: u32 = 1 << 25;
+// The number of cascaded IIR biquads per channel. Select 1 or 2!
+const IIR_CASCADE_LENGTH: usize = 1;
+const LED_PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
+const SCALE: f32 = 16777216.0;
 
 #[derive(Copy, Clone, Debug, Deserialize, MiniconfAtomic)]
 pub struct Iirsettings {
@@ -65,7 +67,7 @@ pub struct Settings {
     led: bool,
     dacs: [f64; 2],
     engage_iir: [bool; 2],
-    iirs: [Iirsettings; 2],
+    iirs: [[iir::IIR; IIR_CASCADE_LENGTH]; 2],
     adcsettings: AdcFilterSettings,
     pwmsettings: [PwmSettings; 2],
 }
@@ -77,16 +79,7 @@ impl Default for Settings {
             led: false,
             dacs: [0.0, 0.0],
             engage_iir: [false, false],
-            iirs: [
-                Iirsettings {
-                    ba: [1.0, 0.0, 0.0, 0.0, 0.0],
-                    target: 8300000.0,
-                },
-                Iirsettings {
-                    ba: [1.0, 0.0, 0.0, 0.0, 0.0],
-                    target: 8300000.0,
-                },
-            ],
+            iirs: [[iir::IIR::new(1., -SCALE, SCALE); IIR_CASCADE_LENGTH]; 2],
             adcsettings: AdcFilterSettings {
                 odr: 0b10000,   // 10Hz output data rate
                 order: 0,       // Sinc5+Sinc1 filter
@@ -116,7 +109,8 @@ const APP: () = {
         adc: Adc,
         dacs: Dacs,
         pwms: Pwms,
-        iirs: Iirs,
+        #[init([[[0.; 5]; IIR_CASCADE_LENGTH]; 2])]
+        iir_state: [[iir::Vec5; IIR_CASCADE_LENGTH]; 2],
         network: NetworkUsers<Settings, Telemetry>,
         settings: Settings,
         telemetry: Telemetry,
@@ -143,9 +137,7 @@ const APP: () = {
 
         let settings = Settings::default();
 
-        let iirs = Iirs::new();
-
-        c.schedule.blink(c.start + PERIOD.cycles()).unwrap();
+        c.schedule.blink(c.start + LED_PERIOD.cycles()).unwrap();
         c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
         c.schedule.tele(c.start + CYC_PER_S.cycles()).unwrap();
 
@@ -163,27 +155,35 @@ const APP: () = {
             adc: thermostat.adc,
             dacs: thermostat.dacs,
             pwms: thermostat.pwms,
-            iirs,
             network,
             settings,
             telemetry: Telemetry::default(),
         }
     }
 
-    #[task(priority=1, resources=[dacs, iirs, telemetry, settings], schedule = [process])]
-    fn process(c: process::Context, adcdata0: u32, adcdata1: u32) {
-        info!("adcdata:\t {:?}\t {:?}", adcdata0, adcdata1);
+    #[task(priority=1, resources=[dacs, iir_state, telemetry, settings], schedule = [process])]
+    fn process(c: process::Context, adcdata: [u32; 2]) {
+        info!("adcdata:\t {:?}\t {:?}", adcdata[0], adcdata[1]);
         let dacs = c.resources.dacs;
-        let iirs = c.resources.iirs;
+        let iir_state = c.resources.iir_state;
         let telemetry = c.resources.telemetry;
         let settings = c.resources.settings;
 
-        let yf0 = iirs.iir0.tick(adcdata0 as f64);
-        let yf1 = iirs.iir1.tick(adcdata1 as f64);
+        let mut yf: [f32; 2] = [0., 0.];
+
+        for ch in 0..adcdata.len() {
+            let y = settings.iirs[ch]
+                .iter()
+                .zip(iir_state[ch].iter_mut())
+                .fold(adcdata[ch] as f32, |yi, (iir_ch, state)| {
+                    iir_ch.update(state, yi, false)
+                });
+            yf[ch] = y;
+        }
 
         // convert to 18 bit fullscale output from 24 bit fullscale float equivalent
-        let yo0 = ((yf0 + 8388608.0) as u32) >> 6;
-        let yo1 = ((yf1 + 8388608.0) as u32) >> 6;
+        let yo0 = ((yf[0] + 8388608.0) as u32) >> 6;
+        let yo1 = ((yf[1] + 8388608.0) as u32) >> 6;
 
         if settings.engage_iir[0] {
             dacs.set(yo0, 0);
@@ -193,23 +193,18 @@ const APP: () = {
         }
 
         // TODO: move this to the tele process
+        // Wie geht das??: telemetry.dac = yf.iter().map(|x| i_to_dac(*x as f64) as f32).collect();
         telemetry.dac[0] = dac_to_i(dacs.val0);
         telemetry.dac[1] = dac_to_i(dacs.val1);
-        telemetry.adc = [adc_to_temp(adcdata0), adc_to_temp(adcdata1)];
+        telemetry.adc = [adc_to_temp(adcdata[0]), adc_to_temp(adcdata[1])];
     }
 
-    #[task(priority = 1, resources=[network, settings, iirs, dacs, adc, pwms])]
+    #[task(priority = 1, resources=[network, settings, dacs, adc, pwms])]
     fn settings_update(c: settings_update::Context) {
         log::info!("updating settings");
         let settings = c.resources.network.miniconf.settings();
 
         *c.resources.settings = *settings;
-
-        // apply settings
-        c.resources.iirs.iir0.ba = c.resources.settings.iirs[0].ba;
-        c.resources.iirs.iir0.target = c.resources.settings.iirs[0].target;
-        c.resources.iirs.iir1.ba = c.resources.settings.iirs[1].ba;
-        c.resources.iirs.iir1.target = c.resources.settings.iirs[1].target;
 
         c.resources
             .adc
@@ -265,7 +260,7 @@ const APP: () = {
                     } // ADC ch1 is thermostat ch0 for unknown reasons
                     _ => {
                         adcdata0 = adcdata;
-                        c.spawn.process(adcdata0, adcdata1).unwrap();
+                        c.spawn.process([adcdata0, adcdata1]).unwrap();
                     }
                 }
             }
@@ -299,7 +294,7 @@ const APP: () = {
             *LED_STATE = true;
         }
 
-        c.schedule.blink(c.scheduled + PERIOD.cycles()).unwrap();
+        c.schedule.blink(c.scheduled + LED_PERIOD.cycles()).unwrap();
     }
 
     #[task(binds = ETH, priority = 1)]

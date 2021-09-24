@@ -44,6 +44,7 @@ mcp23017 = "1.0"
 mutex-trait = "0.2"
 byteorder = { version = "1", default-features = false }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
+idsp = { path = "idsp" }
 
 cortex-m-rtic = "0.5.7"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
@@ -60,8 +61,7 @@ git = "https://github.com/quartiq/smoltcp-nal.git"
 rev = "5baf55f"
 
 [dependencies.miniconf]
-git = "https://github.com/quartiq/miniconf.git"
-rev = "6c19ba2"
+miniconf = { version = "0.1", optional = false }
 
 [dependencies.minimq]
 git = "https://github.com/quartiq/minimq.git"

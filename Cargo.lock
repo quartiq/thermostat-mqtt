@@ -177,7 +177,8 @@ dependencies = [
 [[package]]
 name = "derive_miniconf"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/miniconf.git?rev=6c19ba2#6c19ba208eb426377ff6e09416fcabdf4fd3021d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1622cf1dddfe55eaa54a5223dae7de264d40110080bc55c6d8a9d89daf882d05"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -311,6 +312,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "idsp"
+version = "0.1.0"
+dependencies = [
+ "miniconf",
+ "num-complex",
+ "serde",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -353,7 +363,8 @@ dependencies = [
 [[package]]
 name = "miniconf"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/miniconf.git?rev=6c19ba2#6c19ba208eb426377ff6e09416fcabdf4fd3021d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbb9f957ca15c9f2fc59d2ee1016029822ed1bddd622bcbaefac9c8b2499bb4a"
 dependencies = [
  "derive_miniconf",
  "heapless 0.7.3",
@@ -399,6 +410,7 @@ dependencies = [
  "cortex-m-rt",
  "cortex-m-rtic",
  "heapless 0.7.3",
+ "idsp",
  "log",
  "mcp23017",
  "miniconf",
@@ -447,6 +459,16 @@ name = "no-std-net"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bcece43b12349917e096cddfa66107277f123e6c96a5aea78711dc601a47152"
+
+[[package]]
+name = "num-complex"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26873667bbbb7c5182d4a37c1add32cdf09f841af72da53318fdb81543c15085"
+dependencies = [
+ "num-traits",
+ "serde",
+]
 
 [[package]]
 name = "num-traits"
