@@ -1,5 +1,6 @@
 // Thermostat unit and description conversion
 
+use core::f32;
 use log::{error, info, warn};
 use num_traits::float::Float;
 
@@ -13,7 +14,7 @@ const A: f32 = 0.001125308852122;
 const B: f32 = 0.000234711863267;
 const C: f32 = 0.000000085663516;
 const ZEROK: f32 = 273.15;
-const BCQ: f32 = (B / (3.0 * C)) * (B / (3.0 * C)) * (B / (3.0 * C));
+const BCQ: f32 = (B / (3.0 * C)) * (B / (3.0 * C)) * (B / (3.0 * C)); // helper for inverse
 
 // PWM constants
 const MAXV: f32 = 4.0 * 3.3;
@@ -64,31 +65,39 @@ pub fn v_to_pwm(v: f32) -> f32 {
 pub fn temp_to_iiroffset(temp: f32) -> f32 {
     // T (°C) to R (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
     let t_inv = 1.0 / (temp + ZEROK);
-    info!("t:\t {:?}", t_inv);
     let x = (A - t_inv) / C;
-    info!("x:\t {:?}", x);
-
     let y = (BCQ + ((x / 2.0) * (x / 2.0))).sqrt();
-    info!("y:\t {:?}", y);
-
     let r = ((y - (x / 2.0)).cbrt() - (y + (x / 2.0)).cbrt()).exp();
 
-    info!("r:\t {:?}", r);
     // R to V
     let v = (r * VREF) / (R_INNER + r);
-    info!("v:\t {:?}", v);
 
     // V to raw
     let data = (0.75 * SCALE as f32 * v) / VREF;
-    (data * GAIN as f32) / (0.5 * 0x400000 as f32)
+    (-data * GAIN as f32) / (0.5 * 0x400000 as f32)
 }
 
 pub fn pid_to_iir(pid: [f32; 3]) -> [f32; 5] {
-    [
-        pid[0] + pid[1] + pid[2],
-        -(pid[0] + 2.0 * pid[2]),
-        pid[2],
-        1.0,
-        0.0,
-    ]
+    //PID
+    if (pid[1] > f32::EPSILON) & (pid[2] > f32::EPSILON) {
+        [
+            pid[0] + pid[1] + pid[2],
+            -(pid[0] + 2.0 * pid[2]),
+            pid[2],
+            1.0,
+            0.0,
+        ]
+    }
+    // PI
+    else if pid[1] > f32::EPSILON {
+        [pid[0] + pid[1], -pid[0], 0.0, 1.0, 0.0]
+    }
+    // PD
+    else if pid[2] > f32::EPSILON {
+        [pid[2] + pid[0], -pid[2], 0.0, 0.0, 0.0]
+    }
+    // P
+    else {
+        [pid[0], 0.0, 0.0, 0.0, 0.0]
+    }
 }

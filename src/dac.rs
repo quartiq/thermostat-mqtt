@@ -145,10 +145,9 @@ impl Pwms {
 pub struct Dacs {
     spi0: Dac0Spi,
     sync0: PE4<Output<PushPull>>,
-    pub val0: u32,
+    pub val: [u32; 2],
     spi1: Dac1Spi,
     sync1: PF6<Output<PushPull>>,
-    pub val1: u32,
 }
 
 impl Dacs {
@@ -177,10 +176,9 @@ impl Dacs {
         let mut dacs = Dacs {
             spi0,
             sync0: pins0.sync,
-            val0: 0,
+            val: [0, 0],
             spi1,
             sync1: pins1.sync,
-            val1: 0,
         };
         let _ = dacs.sync0.set_low();
         let _ = dacs.sync1.set_low();
@@ -201,14 +199,14 @@ impl Dacs {
             delay(1000); // 100 * 5.95ns
             let _ = self.sync0.set_low();
             let _ = self.spi0.transfer(&mut buf);
-            self.val0 = value;
+            self.val[0] = value;
         } else {
             let _ = self.sync1.set_high();
             // must be high for >= 33 ns
             delay(1000); // 100 * 5.95ns
             let _ = self.sync1.set_low();
             let _ = self.spi1.transfer(&mut buf);
-            self.val1 = value;
+            self.val[1] = value;
         }
     }
 }

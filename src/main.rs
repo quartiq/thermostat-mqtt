@@ -102,15 +102,15 @@ impl Default for Settings {
             pidsettings: [
                 PidSettings {
                     pid: [1.0, 0., 0.],
-                    target: 22.0,
-                    min: -SCALE,
-                    max: SCALE,
+                    target: 0.0,
+                    min: 0.0,
+                    max: 2.0 * SCALE,
                 },
                 PidSettings {
                     pid: [1.0, 0., 0.],
                     target: 22.0,
-                    min: -SCALE,
-                    max: SCALE,
+                    min: 0.0,
+                    max: 2.0 * SCALE,
                 },
             ],
         }
@@ -199,9 +199,12 @@ const APP: () = {
             yf[ch] = y;
         }
 
-        // convert to 18 bit fullscale output from 24 bit fullscale float equivalent
-        let yo0 = ((yf[0] + 8388608.0) as u32) >> 6;
-        let yo1 = ((yf[1] + 8388608.0) as u32) >> 6;
+        // convert to 18 bit fullscale output from 24 bit fullscale float equivalent. TODO rounding
+        let yo0 = (yf[0] + SCALE) as u32 >> 6;
+        let yo1 = (yf[1] + SCALE) as u32 >> 6;
+        info!("yos:\t {:?}  {:?}", yo0, yo1);
+        info!("yfs:\t {:?}  {:?}", yf[0], yf[1]);
+        info!("y offset:\t {:?}", iirs[0][0].y_offset);
 
         if settings.engage_iir[0] {
             dacs.set(yo0, 0);
@@ -212,15 +215,11 @@ const APP: () = {
 
         // TODO: move this to the tele process
         // Wie geht das??: telemetry.dac = yf.iter().map(|x| i_to_dac(*x as f32) as f32).collect();
-        telemetry.dac[0] = dac_to_i(dacs.val0);
-        telemetry.dac[1] = dac_to_i(dacs.val1);
+        telemetry.dac[0] = dac_to_i(dacs.val[0]);
+        telemetry.dac[1] = dac_to_i(dacs.val[1]);
         telemetry.adc = [adc_to_temp(adcdata[0]), adc_to_temp(adcdata[1])];
 
-        info!(
-            "adcdata:\t {:?}\t {:?}",
-            adc_to_temp(adcdata[0]),
-            temp_to_iiroffset(adc_to_temp(adcdata[0]))
-        );
+        info!("dacdata:\t {:?}", dacs.val);
     }
 
     #[task(priority = 1, resources=[network, settings, dacs, adc, pwms, iirs])]
@@ -238,13 +237,29 @@ const APP: () = {
             c.resources.settings.pwmsettings[0],
             c.resources.settings.pwmsettings[1],
         );
-        // log::info!(
-        //     "{:?} /t {:?}",
-        //     c.resources.settings.dacs[0],
-        //     i_to_dac(c.resources.settings.dacs[0])
-        // );
 
+        // c.resources.iirs[0][0].ba = [1.0, 0., 0., 0., 0.];
         c.resources.iirs[0][0].ba = pid_to_iir(c.resources.settings.pidsettings[0].pid);
+        c.resources.iirs[0][0].set_x_offset(temp_to_iiroffset(
+            c.resources.settings.pidsettings[0].target,
+        ));
+
+        // c.resources.iirs[0][0].y_offset =
+        //     temp_to_iiroffset(c.resources.settings.pidsettings[0].target);
+
+        info!(
+            "target raw:\t {:?}",
+            temp_to_iiroffset(c.resources.settings.pidsettings[0].target,)
+        );
+        // info!(
+        //     "target:\t {:?}",
+        //     adc_to_temp(c.resources.iirs[0][0].get_x_offset().unwrap() as u32)
+        // );
+        info!("y offset:\t {:?}", c.resources.iirs[0][0].y_offset);
+        info!(
+            "iir:\t {:?}",
+            pid_to_iir(c.resources.settings.pidsettings[0].pid)
+        );
 
         if !c.resources.settings.engage_iir[0] {
             c.resources
