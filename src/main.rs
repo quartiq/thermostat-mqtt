@@ -102,15 +102,15 @@ impl Default for Settings {
             pidsettings: [
                 PidSettings {
                     pid: [1.0, 0., 0.],
-                    target: 0.0,
-                    min: 0.0,
-                    max: 2.0 * SCALE,
+                    target: 22.0,
+                    min: -SCALE,
+                    max: SCALE,
                 },
                 PidSettings {
                     pid: [1.0, 0., 0.],
                     target: 22.0,
-                    min: 0.0,
-                    max: 2.0 * SCALE,
+                    min: -SCALE,
+                    max: SCALE,
                 },
             ],
         }
