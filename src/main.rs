@@ -196,7 +196,7 @@ const APP: () = {
                 .fold(adcdata[ch] as f32, |yi, (iir_ch, state)| {
                     iir_ch.update(state, yi, false)
                 });
-            yf[ch] = (y + SCALE) as u32 >> 6; // ToDo Rounding
+            yf[ch] = (y + SCALE + 32.0) as u32 >> 6; // Round half up
             if settings.engage_iir[ch] {
                 dacs.set(yf[ch], ch as u8);
             }
