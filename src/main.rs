@@ -9,7 +9,7 @@ mod network_users;
 mod telemetry;
 mod unit_conversion;
 use network_users::{NetworkState, NetworkUsers, UpdateState};
-use telemetry::Telemetry;
+use telemetry::{Telemetry, TelemetryBuffer};
 use unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset};
 
 mod adc;
@@ -129,7 +129,7 @@ const APP: () = {
         iir_state: [[iir::Vec5; IIR_CASCADE_LENGTH]; 2],
         network: NetworkUsers<Settings, Telemetry>,
         settings: Settings,
-        telemetry: Telemetry,
+        telemetry: TelemetryBuffer,
     }
 
     // #[init(schedule = [blink, poll_eth])]
@@ -174,7 +174,7 @@ const APP: () = {
             iirs: [[iir::IIR::new(1., -SCALE, SCALE); IIR_CASCADE_LENGTH]; 2],
             network,
             settings,
-            telemetry: Telemetry::default(),
+            telemetry: TelemetryBuffer::default(),
         }
     }
 
@@ -187,7 +187,7 @@ const APP: () = {
         let telemetry = c.resources.telemetry;
         let settings = c.resources.settings;
 
-        let mut yf: [f32; 2] = [0., 0.];
+        let mut yf: [u32; 2] = [0, 0];
 
         for ch in 0..adcdata.len() {
             let y = iirs[ch]
@@ -196,28 +196,14 @@ const APP: () = {
                 .fold(adcdata[ch] as f32, |yi, (iir_ch, state)| {
                     iir_ch.update(state, yi, false)
                 });
-            yf[ch] = y;
+            yf[ch] = (y + SCALE) as u32 >> 6; // ToDo Rounding
+            if settings.engage_iir[ch] {
+                dacs.set(yf[ch], ch as u8);
+            }
         }
 
-        // convert to 18 bit fullscale output from 24 bit fullscale float equivalent. TODO rounding
-        let yo0 = (yf[0] + SCALE) as u32 >> 6;
-        let yo1 = (yf[1] + SCALE) as u32 >> 6;
-        info!("yos:\t {:?}  {:?}", yo0, yo1);
-        info!("yfs:\t {:?}  {:?}", yf[0], yf[1]);
-        info!("y offset:\t {:?}", iirs[0][0].y_offset);
-
-        if settings.engage_iir[0] {
-            dacs.set(yo0, 0);
-        }
-        if settings.engage_iir[1] {
-            dacs.set(yo1, 1);
-        }
-
-        // TODO: move this to the tele process
-        // Wie geht das??: telemetry.dac = yf.iter().map(|x| i_to_dac(*x as f32) as f32).collect();
-        telemetry.dac[0] = dac_to_i(dacs.val[0]);
-        telemetry.dac[1] = dac_to_i(dacs.val[1]);
-        telemetry.adc = [adc_to_temp(adcdata[0]), adc_to_temp(adcdata[1])];
+        telemetry.adcs = adcdata;
+        telemetry.dacs = dacs.val;
 
         info!("dacdata:\t {:?}", dacs.val);
     }
@@ -238,28 +224,10 @@ const APP: () = {
             c.resources.settings.pwmsettings[1],
         );
 
-        // c.resources.iirs[0][0].ba = [1.0, 0., 0., 0., 0.];
         c.resources.iirs[0][0].ba = pid_to_iir(c.resources.settings.pidsettings[0].pid);
         c.resources.iirs[0][0].set_x_offset(temp_to_iiroffset(
             c.resources.settings.pidsettings[0].target,
         ));
-
-        // c.resources.iirs[0][0].y_offset =
-        //     temp_to_iiroffset(c.resources.settings.pidsettings[0].target);
-
-        info!(
-            "target raw:\t {:?}",
-            temp_to_iiroffset(c.resources.settings.pidsettings[0].target,)
-        );
-        // info!(
-        //     "target:\t {:?}",
-        //     adc_to_temp(c.resources.iirs[0][0].get_x_offset().unwrap() as u32)
-        // );
-        info!("y offset:\t {:?}", c.resources.iirs[0][0].y_offset);
-        info!(
-            "iir:\t {:?}",
-            pid_to_iir(c.resources.settings.pidsettings[0].pid)
-        );
 
         if !c.resources.settings.engage_iir[0] {
             c.resources
@@ -309,11 +277,13 @@ const APP: () = {
 
     #[task(priority = 1, resources = [network, telemetry, settings], schedule = [tele])]
     fn tele(c: tele::Context) {
+        // TODO: move this to the tele process
+        // Wie geht das??: telemetry.dac = yf.iter().map(|x| i_to_dac(*x as f32) as f32).collect();
         c.resources.network.telemetry.update();
         c.resources
             .network
             .telemetry
-            .publish(&c.resources.telemetry);
+            .publish(&c.resources.telemetry.finalize());
 
         c.schedule
             .tele(

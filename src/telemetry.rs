@@ -16,6 +16,7 @@ use serde::Serialize;
 
 use crate::network_users::NetworkReference;
 // use crate::hardware::{adc::AdcCode, afe::Gain, dac::DacCode};
+use crate::unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset};
 use minimq::embedded_nal::IpAddr;
 
 /// The telemetry client for reporting telemetry data over MQTT.
@@ -24,23 +25,28 @@ pub struct TelemetryClient<T: Serialize> {
     telemetry_topic: String<128>,
     _telemetry: core::marker::PhantomData<T>,
 }
-//
-// /// The telemetry buffer is used for storing sample values during execution.
-// ///
-// /// # Note
-// /// These values can be converted to SI units immediately before reporting to save processing time.
-// /// This allows for the DSP process to continually update the values without incurring significant
-// /// run-time overhead during conversion to SI units.
-// #[derive(Copy, Clone)]
-// pub struct TelemetryBuffer {
-//     /// The latest input sample on ADC0/ADC1.
-//     pub adcs: [AdcCode; 2],
-//     /// The latest output code on DAC0/DAC1.
-//     pub dacs: [DacCode; 2],
-//     /// The latest digital input states during processing.
-//     pub digital_inputs: [bool; 2],
-// }
-//
+
+/// The telemetry buffer is used for storing sample values during execution.
+///
+/// # Note
+/// These values can be converted to SI units immediately before reporting to save processing time.
+/// This allows for the DSP process to continually update the values without incurring significant
+/// run-time overhead during conversion to SI units.
+#[derive(Copy, Clone)]
+pub struct TelemetryBuffer {
+    pub adcs: [u32; 2],
+    pub dacs: [u32; 2],
+}
+
+impl Default for TelemetryBuffer {
+    fn default() -> Self {
+        Self {
+            adcs: [0, 0],
+            dacs: [0, 0],
+        }
+    }
+}
+
 /// The telemetry structure is data that is ultimately reported as telemetry over MQTT.
 ///
 /// # Note
@@ -48,39 +54,35 @@ pub struct TelemetryClient<T: Serialize> {
 /// overhead.
 #[derive(Serialize)]
 pub struct Telemetry {
-    pub dac: [f32; 2],
-    pub adc: [f32; 2],
+    pub dacs: [f32; 2],
+    pub adcs: [f32; 2],
 }
 
 impl Default for Telemetry {
     fn default() -> Self {
         Self {
-            dac: [0.0, 0.0],
-            adc: [0.0, 0.0],
+            dacs: [0.0, 0.0],
+            adcs: [0.0, 0.0],
         }
     }
 }
 
-// impl TelemetryBuffer {
-//     /// Convert the telemetry buffer to finalized, SI-unit telemetry for reporting.
-//     ///
-//     /// # Args
-//     /// * `afe0` - The current AFE configuration for channel 0.
-//     /// * `afe1` - The current AFE configuration for channel 1.
-//     ///
-//     /// # Returns
-//     /// The finalized telemetry structure that can be serialized and reported.
-//     pub fn finalize(self, afe0: Gain, afe1: Gain) -> Telemetry {
-//         let in0_volts = Into::<f32>::into(self.adcs[0]) / afe0.as_multiplier();
-//         let in1_volts = Into::<f32>::into(self.adcs[1]) / afe1.as_multiplier();
-//
-//         Telemetry {
-//             adcs: [in0_volts, in1_volts],
-//             dacs: [self.dacs[0].into(), self.dacs[1].into()],
-//             digital_inputs: self.digital_inputs,
-//         }
-//     }
-// }
+impl TelemetryBuffer {
+    /// Convert the telemetry buffer to finalized, SI-unit telemetry for reporting.
+    ///
+    /// # Args
+    /// * `afe0` - The current AFE configuration for channel 0.
+    /// * `afe1` - The current AFE configuration for channel 1.
+    ///
+    /// # Returns
+    /// The finalized telemetry structure that can be serialized and reported.
+    pub fn finalize(self) -> Telemetry {
+        Telemetry {
+            adcs: [adc_to_temp(self.adcs[0]), adc_to_temp(self.adcs[1])],
+            dacs: [dac_to_i(self.dacs[0]), dac_to_i(self.dacs[1])],
+        }
+    }
+}
 
 impl<T: Serialize> TelemetryClient<T> {
     /// Construct a new telemetry client.
