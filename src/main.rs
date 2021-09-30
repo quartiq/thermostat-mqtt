@@ -277,8 +277,7 @@ const APP: () = {
 
     #[task(priority = 1, resources = [network, telemetry, settings], schedule = [tele])]
     fn tele(c: tele::Context) {
-        // TODO: move this to the tele process
-        // Wie geht das??: telemetry.dac = yf.iter().map(|x| i_to_dac(*x as f32) as f32).collect();
+        // Wie geht das??: telemetry.dac = yf. iter().map(|x| i_to_dac(*x as f32) as f32).collect();
         c.resources.network.telemetry.update();
         c.resources
             .network

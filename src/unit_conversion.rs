@@ -7,7 +7,6 @@ use num_traits::float::Float;
 // ADC constants
 const GAIN: u32 = 0x555555;
 const R_INNER: f32 = 2.0 * 5100.0;
-const VREF: f32 = 3.3;
 
 // Steinhart-Hart Parameters
 const A: f32 = 0.001125308852122;
@@ -30,12 +29,10 @@ const VREF_DAC: f32 = 3.0;
 const SCALE: u32 = 1 << 23;
 
 pub fn adc_to_temp(adc: u32) -> f32 {
-    // raw to V
+    // raw to R
     let data = (adc as f32) * (0.5 * 0x400000 as f32 / GAIN as f32);
-    let vin = data as f32 * VREF / (0.75 * SCALE as f32);
-
-    // V to R
-    let r = (R_INNER as f32) / ((VREF as f32 / vin) - 1.0);
+    let vin = data as f32 / (0.75 * SCALE as f32);
+    let r = (R_INNER as f32) / ((1.0 / vin) - 1.0);
 
     // R to T (°C) (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
     let lnr = r.ln();
@@ -69,11 +66,9 @@ pub fn temp_to_iiroffset(temp: f32) -> f32 {
     let y = (BCQ + ((x / 2.0) * (x / 2.0))).sqrt();
     let r = ((y - (x / 2.0)).cbrt() - (y + (x / 2.0)).cbrt()).exp();
 
-    // R to V
-    let v = (r * VREF) / (R_INNER + r);
-
-    // V to raw
-    let data = (0.75 * SCALE as f32 * v) / VREF;
+    // R to raw
+    let v = r / (R_INNER + r);
+    let data = 0.75 * SCALE as f32 * v;
     (-data * GAIN as f32) / (0.5 * 0x400000 as f32)
 }
 
