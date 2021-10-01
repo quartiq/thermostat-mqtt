@@ -34,7 +34,6 @@ pub use miniconf::{Miniconf, MiniconfAtomic};
 pub use num_traits;
 pub use serde::Deserialize;
 
-// The number of cascaded IIR biquads per channel. Select 1 or 2!
 const IIR_CASCADE_LENGTH: usize = 1;
 const LED_PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
@@ -222,20 +221,19 @@ const APP: () = {
             c.resources.settings.pwmsettings[1],
         );
 
-        c.resources.iirs[0][0].ba = pid_to_iir(c.resources.settings.pidsettings[0].pid);
-        c.resources.iirs[0][0].set_x_offset(temp_to_iiroffset(
-            c.resources.settings.pidsettings[0].target,
-        ));
-
-        if !c.resources.settings.engage_iir[0] {
-            c.resources
-                .dacs
-                .set(i_to_dac(c.resources.settings.dacs[0]), 0);
+        for (i, iir) in c.resources.iirs[0].iter_mut().enumerate() {
+            iir.ba = pid_to_iir(c.resources.settings.pidsettings[i].pid);
+            iir.set_x_offset(c.resources.settings.pidsettings[i].target);
+            iir.y_min = c.resources.settings.pidsettings[i].min;
+            iir.y_max = c.resources.settings.pidsettings[i].max;
         }
-        if !c.resources.settings.engage_iir[1] {
-            c.resources
-                .dacs
-                .set(i_to_dac(c.resources.settings.dacs[1]), 1);
+
+        for (i, eng) in c.resources.settings.engage_iir.iter_mut().enumerate() {
+            if !*eng {
+                c.resources
+                    .dacs
+                    .set(i_to_dac(c.resources.settings.dacs[i]), i as u8);
+            }
         }
     }
 
@@ -262,8 +260,9 @@ const APP: () = {
                 match ch {
                     0 => {
                         adcdata1 = adcdata;
-                    } // ADC ch1 is thermostat ch0
+                    }
                     _ => {
+                        // ADC ch1 is thermostat ch0
                         adcdata0 = adcdata;
                         c.spawn.process([adcdata0, adcdata1]).unwrap();
                     }
