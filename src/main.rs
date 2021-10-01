@@ -204,8 +204,6 @@ const APP: () = {
 
         telemetry.adcs = adcdata;
         telemetry.dacs = dacs.val;
-
-        info!("dacdata:\t {:?}", dacs.val);
     }
 
     #[task(priority = 1, resources=[network, settings, dacs, adc, pwms, iirs])]
@@ -244,7 +242,6 @@ const APP: () = {
     #[task(priority = 1, resources = [network], schedule = [poll_eth],  spawn=[settings_update])]
     fn poll_eth(c: poll_eth::Context) {
         static mut NOW: u32 = 0;
-        // log::info!("poll eth");
 
         match c.resources.network.update(*NOW) {
             NetworkState::SettingsChanged => c.spawn.settings_update().unwrap(),
@@ -265,7 +262,7 @@ const APP: () = {
                 match ch {
                     0 => {
                         adcdata1 = adcdata;
-                    } // ADC ch1 is thermostat ch0 for unknown reasons
+                    } // ADC ch1 is thermostat ch0
                     _ => {
                         adcdata0 = adcdata;
                         c.spawn.process([adcdata0, adcdata1]).unwrap();
