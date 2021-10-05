@@ -200,7 +200,7 @@ const APP: () = {
                 dacs.set(yf[ch], ch as u8);
             }
         }
-
+        info!("dacdata:\t {:?}\t {:?}", dacs.val[0], dacs.val[1]);
         telemetry.adcs = adcdata;
         telemetry.dacs = dacs.val;
     }
@@ -221,11 +221,12 @@ const APP: () = {
             c.resources.settings.pwmsettings[1],
         );
 
-        for (i, iir) in c.resources.iirs[0].iter_mut().enumerate() {
-            iir.ba = pid_to_iir(c.resources.settings.pidsettings[i].pid);
-            iir.set_x_offset(c.resources.settings.pidsettings[i].target);
-            iir.y_min = c.resources.settings.pidsettings[i].min;
-            iir.y_max = c.resources.settings.pidsettings[i].max;
+        for (i, iir) in c.resources.iirs.iter_mut().enumerate() {
+            info!("dacdata:\t {:?}", c.resources.settings.pidsettings[i]);
+            iir[0].set_x_offset(c.resources.settings.pidsettings[i].target);
+            iir[0].ba = pid_to_iir(c.resources.settings.pidsettings[i].pid);
+            iir[0].y_min = c.resources.settings.pidsettings[i].min;
+            iir[0].y_max = c.resources.settings.pidsettings[i].max;
         }
 
         for (i, eng) in c.resources.settings.engage_iir.iter_mut().enumerate() {
