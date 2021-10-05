@@ -200,7 +200,6 @@ const APP: () = {
                 dacs.set(yf[ch], ch as u8);
             }
         }
-        info!("dacdata:\t {:?}\t {:?}", dacs.val[0], dacs.val[1]);
         telemetry.adcs = adcdata;
         telemetry.dacs = dacs.val;
     }
@@ -222,7 +221,6 @@ const APP: () = {
         );
 
         for (i, iir) in c.resources.iirs.iter_mut().enumerate() {
-            info!("dacdata:\t {:?}", c.resources.settings.pidsettings[i]);
             iir[0].set_x_offset(temp_to_iiroffset(
                 c.resources.settings.pidsettings[i].target,
             ));
