@@ -171,7 +171,7 @@ const APP: () = {
         }
     }
 
-    #[task(priority=1, resources=[dacs, iir_state, iirs, telemetry, settings], schedule = [process])]
+    #[task(priority=1, resources=[dacs, iir_state, iirs, telemetry, settings])]
     fn process(c: process::Context, adcdata: [u32; 2]) {
         info!("adcdata:\t {:?}\t {:?}", adcdata[0], adcdata[1]);
         let dacs = c.resources.dacs;
@@ -216,13 +216,13 @@ const APP: () = {
 
         for (i, iir) in c.resources.iirs.iter_mut().enumerate() {
             iir[0]
-                .set_x_offset(temp_to_iiroffset(c.resources.settings.pidsettings[i].target) as f64);
-            iir[0]
                 .ba
                 .iter_mut()
                 .zip(pid_to_iir(c.resources.settings.pidsettings[i].pid).iter())
                 .map(|(d, x)| *d = *x as f64)
                 .last();
+            iir[0]
+                .set_x_offset(temp_to_iiroffset(c.resources.settings.pidsettings[i].target) as f64);
             iir[0].y_min = c.resources.settings.pidsettings[i].min as f64;
             iir[0].y_max = c.resources.settings.pidsettings[i].max as f64;
         }
