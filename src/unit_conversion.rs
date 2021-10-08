@@ -23,6 +23,7 @@ const R_SENSE: f32 = 0.05;
 const VREF_TEC: f32 = 1.5;
 const MAXCODE: f32 = 262144.0;
 const VREF_DAC: f32 = 3.0;
+const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 
 // IIR constants
 const SCALE: u32 = 1 << 23;
@@ -65,30 +66,30 @@ pub fn temp_to_iiroffset(temp: f32) -> f32 {
     // R to raw
     let v = r / (R_INNER + r);
     let data = 0.75 * SCALE as f32 * v;
-    (-data * GAIN as f32) / (0.5 * 0x400000 as f32)
+    let data = (-data * GAIN as f32) / (0.5 * 0x400000 as f32);
+
+    // add DAC offset
+    data //- MAXCODE / 2.0
 }
 
 pub fn pid_to_iir(pid: [f32; 3]) -> [f32; 5] {
+    let kp = pid[0] * DATAWIDTH_GAIN;
+    let ki = pid[1] * DATAWIDTH_GAIN;
+    let kd = pid[2] * DATAWIDTH_GAIN;
     //PID
-    if (pid[1] > f32::EPSILON) & (pid[2] > f32::EPSILON) {
-        [
-            pid[0] + pid[1] + pid[2],
-            -(pid[0] + 2.0 * pid[2]),
-            pid[2],
-            1.0,
-            0.0,
-        ]
+    if (ki > f32::EPSILON) & (kd > f32::EPSILON) {
+        [kp + ki + kd, -(kp + 2.0 * kd), kd, 1.0, 0.0]
     }
     // PI
-    else if pid[1] > f32::EPSILON {
-        [pid[0] + pid[1], -pid[0], 0.0, 1.0, 0.0]
+    else if ki > f32::EPSILON {
+        [kp + ki, -kp, 0.0, 1.0, 0.0]
     }
     // PD
-    else if pid[2] > f32::EPSILON {
-        [pid[2] + pid[0], -pid[2], 0.0, 0.0, 0.0]
+    else if kd > f32::EPSILON {
+        [kd + kp, -kd, 0.0, 0.0, 0.0]
     }
     // P
     else {
-        [pid[0], 0.0, 0.0, 0.0, 0.0]
+        [kp, 0.0, 0.0, 0.0, 0.0]
     }
 }

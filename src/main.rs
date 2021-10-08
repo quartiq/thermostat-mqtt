@@ -38,6 +38,7 @@ const IIR_CASCADE_LENGTH: usize = 1;
 const LED_PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
 const SCALE: f32 = 8388608.0;
+const OUTSCALE: f32 = 131072.0;
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct PidSettings {
@@ -180,18 +181,17 @@ const APP: () = {
         let telemetry = c.resources.telemetry;
         let settings = c.resources.settings;
 
-        let mut yf: [u32; 2] = [0, 0];
+        let mut y: [u32; 2] = [0, 0];
 
         for ch in 0..adcdata.len() {
-            let y = iirs[ch]
+            y[ch] = iirs[ch]
                 .iter()
                 .zip(iir_state[ch].iter_mut())
                 .fold(adcdata[ch] as f64, |yi, (iir_ch, state)| {
                     iir_ch.update(state, yi, false)
-                });
-            yf[ch] = (y + SCALE as f64 + 32.0) as u32 >> 6; // Round half up
+                }) as u32;
             if settings.engage_iir[ch] {
-                dacs.set(yf[ch], ch as u8);
+                dacs.set(y[ch], ch as u8);
             }
         }
         telemetry.adcs = adcdata;
@@ -223,9 +223,13 @@ const APP: () = {
                 .last();
             iir[0]
                 .set_x_offset(temp_to_iiroffset(c.resources.settings.pidsettings[i].target) as f64);
+            iir[0].y_offset = iir[0].y_offset + OUTSCALE as f64; // add output offset to half range
             iir[0].y_min = c.resources.settings.pidsettings[i].min as f64;
             iir[0].y_max = c.resources.settings.pidsettings[i].max as f64;
         }
+
+        log::info!("ba: {:?}", c.resources.iirs[0][0].ba);
+        // log::info!("x_offset: {:?}", c.resources.iirs[0][0].x_offset);
 
         for (i, eng) in c.resources.settings.engage_iir.iter_mut().enumerate() {
             if !*eng {
