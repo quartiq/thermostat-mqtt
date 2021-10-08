@@ -123,7 +123,7 @@ const APP: () = {
         adc: Adc,
         dacs: Dacs,
         pwms: Pwms,
-        iirs: [[iir::IIR; IIR_CASCADE_LENGTH]; 2],
+        iirs: [[iir::IIR<f32>; IIR_CASCADE_LENGTH]; 2],
         #[init([[[0.; 5]; IIR_CASCADE_LENGTH]; 2])]
         iir_state: [[iir::Vec5; IIR_CASCADE_LENGTH]; 2],
         network: NetworkUsers<Settings, Telemetry>,
@@ -132,7 +132,7 @@ const APP: () = {
     }
 
     // #[init(schedule = [blink, poll_eth])]
-    #[init(schedule = [blink, poll_eth, process, tele])]
+    #[init(schedule = [blink, poll_eth, process, tele], spawn = [settings_update])]
     fn init(c: init::Context) -> init::LateResources {
         let mut thermostat = setup::setup(c.core, c.device);
 
@@ -157,13 +157,7 @@ const APP: () = {
         c.schedule.tele(c.start + CYC_PER_S.cycles()).unwrap();
 
         // apply default settings
-        thermostat.dacs.set(i_to_dac(settings.dacs[1]), 1);
-        thermostat.dacs.set(i_to_dac(settings.dacs[0]), 0);
-        thermostat.adc.set_filters(settings.adcsettings);
-        thermostat
-            .pwms
-            .set_all(settings.pwmsettings[0], settings.pwmsettings[1]);
-
+        c.spawn.settings_update().unwrap();
         log::info!("init done");
         init::LateResources {
             leds: thermostat.leds,
@@ -274,7 +268,7 @@ const APP: () = {
 
     #[task(priority = 1, resources = [network, telemetry, settings], schedule = [tele])]
     fn tele(c: tele::Context) {
-        // Wie geht das??: telemetry.dac = yf. iter().map(|x| i_to_dac(*x as f32) as f32).collect();
+        // Wie geht das??: telemetry.dac.iter_mut().zip(yf.iter()).map(|&mut d, &x| *d = i_to_dac(x as f32) as f32).last();
         c.resources.network.telemetry.update();
         c.resources
             .network

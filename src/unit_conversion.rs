@@ -9,11 +9,10 @@ const GAIN: u32 = 0x555555;
 const R_INNER: f32 = 2.0 * 5100.0;
 
 // Steinhart-Hart Parameters
-const A: f32 = 0.001125308852122;
-const B: f32 = 0.000234711863267;
-const C: f32 = 0.000000085663516;
 const ZEROK: f32 = 273.15;
-const BCQ: f32 = (B / (3.0 * C)) * (B / (3.0 * C)) * (B / (3.0 * C)); // helper for inverse
+const B: f32 = 3988.0;
+const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
+const R_N: f32 = 10000.0;
 
 // PWM constants
 const MAXV: f32 = 4.0 * 3.3;
@@ -35,8 +34,7 @@ pub fn adc_to_temp(adc: u32) -> f32 {
     let r = (R_INNER as f32) / ((1.0 / vin) - 1.0);
 
     // R to T (°C) (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
-    let lnr = r.ln();
-    let t_inv = A + B * lnr + C * lnr * lnr * lnr;
+    let t_inv = T_N_INV + (1.0 / B) * (r / R_N).ln();
     ((1.0 / t_inv) - ZEROK) as f32
 }
 
@@ -62,9 +60,7 @@ pub fn v_to_pwm(v: f32) -> f32 {
 pub fn temp_to_iiroffset(temp: f32) -> f32 {
     // T (°C) to R (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
     let t_inv = 1.0 / (temp + ZEROK);
-    let x = (A - t_inv) / C;
-    let y = (BCQ + ((x / 2.0) * (x / 2.0))).sqrt();
-    let r = ((y - (x / 2.0)).cbrt() - (y + (x / 2.0)).cbrt()).exp();
+    let r = R_N * (B * (t_inv - T_N_INV)).exp();
 
     // R to raw
     let v = r / (R_INNER + r);
