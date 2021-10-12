@@ -102,13 +102,13 @@ impl Default for Settings {
             pidsettings: [
                 PidSettings {
                     pid: [1.0, 0., 0.],
-                    target: 22.0,
+                    target: 25.0,
                     min: -SCALE,
                     max: SCALE,
                 },
                 PidSettings {
                     pid: [1.0, 0., 0.],
-                    target: 22.0,
+                    target: 25.0,
                     min: -SCALE,
                     max: SCALE,
                 },
@@ -222,13 +222,13 @@ const APP: () = {
                 .map(|(d, x)| *d = *x as f64)
                 .last();
             iir[0]
-                .set_x_offset(temp_to_iiroffset(c.resources.settings.pidsettings[i].target) as f64);
+                .set_x_offset(temp_to_iiroffset(c.resources.settings.pidsettings[i].target) as f64); // set input offset to target
             iir[0].y_offset = iir[0].y_offset + OUTSCALE as f64; // add output offset to half range
             iir[0].y_min = c.resources.settings.pidsettings[i].min as f64;
             iir[0].y_max = c.resources.settings.pidsettings[i].max as f64;
         }
 
-        log::info!("ba: {:?}", c.resources.iirs[0][0].ba);
+        log::info!("ba: {:?}", c.resources.iirs[0][0].y_offset);
         // log::info!("x_offset: {:?}", c.resources.iirs[0][0].x_offset);
 
         for (i, eng) in c.resources.settings.engage_iir.iter_mut().enumerate() {

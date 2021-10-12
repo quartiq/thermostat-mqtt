@@ -66,10 +66,7 @@ pub fn temp_to_iiroffset(temp: f32) -> f32 {
     // R to raw
     let v = r / (R_INNER + r);
     let data = 0.75 * SCALE as f32 * v;
-    let data = (-data * GAIN as f32) / (0.5 * 0x400000 as f32);
-
-    // add DAC offset
-    data //- MAXCODE / 2.0
+    (-data * GAIN as f32) / (0.5 * 0x400000 as f32)
 }
 
 pub fn pid_to_iir(pid: [f32; 3]) -> [f32; 5] {
