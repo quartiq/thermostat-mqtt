@@ -15,14 +15,14 @@ const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
 const R_N: f32 = 10000.0;
 
 // PWM constants
-const MAXV: f32 = 4.0 * 3.0;
+const MAXV: f32 = 4.0 * 3.3;
 const MAXI: f32 = 3.0;
 
 // DAC constants
 const R_SENSE: f32 = 0.05;
 const VREF_TEC: f32 = 1.5;
 const MAXCODE: f32 = 262144.0;
-const VREF_DAC: f32 = 3.0;
+const VREF_DAC: f32 = 3.025;
 const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 
 // IIR constants
