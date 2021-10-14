@@ -28,15 +28,15 @@ const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 // IIR constants
 const SCALE: u32 = 1 << 23;
 
-pub fn adc_to_temp(adc: u32) -> f32 {
+pub fn adc_to_temp(adc: u32) -> f64 {
     // raw to R
-    let data = (adc as f32) * (0.5 * 0x400000 as f32 / GAIN as f32);
-    let vin = data as f32 / (0.75 * SCALE as f32);
-    let r = (R_INNER as f32) / ((1.0 / vin) - 1.0);
+    let data = (adc as f64) * (0.5 * 0x400000 as f64 / GAIN as f64);
+    let vin = data as f64 / (0.75 * SCALE as f64);
+    let r = (R_INNER as f64) / ((1.0 / vin) - 1.0);
 
     // R to T (°C) (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
-    let t_inv = T_N_INV + (1.0 / B) * (r / R_N).ln();
-    ((1.0 / t_inv) - ZEROK) as f32
+    let t_inv = T_N_INV as f64 + (1.0 / B as f64) * (r / R_N as f64).ln();
+    ((1.0 / t_inv) - ZEROK as f64) as f64
 }
 
 pub fn i_to_dac(i: f32) -> u32 {
