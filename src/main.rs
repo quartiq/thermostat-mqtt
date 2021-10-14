@@ -38,7 +38,7 @@ const IIR_CASCADE_LENGTH: usize = 1;
 const LED_PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
 const SCALE: f32 = 8388608.0;
-const OUTSCALE: f32 = 131072.0 * 3.0/3.3;
+const OUTSCALE: f32 = 131072.0;
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct PidSettings {
