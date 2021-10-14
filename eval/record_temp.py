@@ -5,6 +5,8 @@ import logging
 import json
 import sys
 import csv
+import matplotlib.pyplot as plt
+
 
 from miniconf import Miniconf
 from gmqtt import Client as MqttClient
@@ -74,14 +76,22 @@ def main():
     async def record():
         interface = await Miniconf.create(args.prefix, args.broker)
 
-        await interface.command('telemetry_period', 1, retain=False)
+        await interface.command('telemetry_period', 1.6, retain=False)
+        await interface.command('adcsettings/odr', 22, retain=False)
+
+        # fig = plt.figure()
+        # ax = fig.add_subplot(1, 1, 1)
+        # plt.show()
 
         f = open('adcvals.csv', 'w')
         writer = csv.writer(f)
+        temp = []
         for i in range(MAXLEN):
-            temp = await get_tele(telemetry_queue)
-            writer.writerow([temp])
-            print(f'Latest telemtry: {temp}')
+            temp.append(await get_tele(telemetry_queue))
+            writer.writerow([temp[i]])
+            print(f'temp: {temp[i]}')
+            # ax.clear()
+            # ax.plot(temp)
 
         f.close()
         telemetry_task.cancel()
