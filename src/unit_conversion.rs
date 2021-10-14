@@ -15,7 +15,7 @@ const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
 const R_N: f32 = 10000.0;
 
 // PWM constants
-const MAXV: f32 = 4.0 * 3.3;
+const MAXV: f32 = 4.0 * 3.0;
 const MAXI: f32 = 3.0;
 
 // DAC constants
