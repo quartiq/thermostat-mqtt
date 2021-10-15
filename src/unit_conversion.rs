@@ -15,7 +15,7 @@ const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
 const R_N: f32 = 10000.0;
 
 // PWM constants
-const MAXV: f32 = 4.0 * 3.3;
+const MAXV: f32 = 5.0;
 const MAXI: f32 = 3.0;
 
 // DAC constants
@@ -34,7 +34,7 @@ pub fn adc_to_temp(adc: u32) -> f32 {
     let vin = data as f32 / (0.75 * SCALE as f32);
     let r = (R_INNER as f32) / ((1.0 / vin) - 1.0);
 
-    // R to T (°C) (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
+    // R to T (°C)
     let t_inv = T_N_INV + (1.0 / B) * (r / R_N).ln();
     ((1.0 / t_inv) - ZEROK) as f32
 }
@@ -51,15 +51,15 @@ pub fn dac_to_i(val: u32) -> f32 {
 }
 
 pub fn i_to_pwm(i: f32) -> f32 {
-    MAXI / i
+    i / MAXI
 }
 
 pub fn v_to_pwm(v: f32) -> f32 {
-    MAXV / v
+    v / MAXV
 }
 
 pub fn temp_to_iiroffset(temp: f32) -> f32 {
-    // T (°C) to R (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
+    // T (°C) to R
     let t_inv = 1.0 / (temp + ZEROK);
     let r = R_N * (B * (t_inv - T_N_INV)).exp();
 
