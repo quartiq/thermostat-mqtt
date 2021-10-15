@@ -122,14 +122,22 @@ impl Pwms {
             0 => set(&mut self.max_v0, v_to_pwm(val)),
             1 => set(&mut self.max_v1, v_to_pwm(val)),
             2 => set(&mut self.max_i_pos0, i_to_pwm(val)),
-            4 => set(&mut self.max_i_neg0, i_to_pwm(val)),
-            3 => set(&mut self.max_i_pos1, i_to_pwm(val)),
+            3 => set(&mut self.max_i_neg0, i_to_pwm(val)),
+            4 => set(&mut self.max_i_pos1, i_to_pwm(val)),
             5 => set(&mut self.max_i_neg1, i_to_pwm(val)),
             _ => unreachable!(),
         }
     }
 
-    pub fn set_all(&mut self, min_i0: f32, min_i1: f32, max_i0: f32, max_i1: f32, max_v0: f32, max_v1: f32) {
+    pub fn set_all(
+        &mut self,
+        min_i0: f32,
+        max_i0: f32,
+        max_v0: f32,
+        min_i1: f32,
+        max_i1: f32,
+        max_v1: f32,
+    ) {
         self.set(max_v0, 0);
         self.set(max_v1, 1);
         self.set(max_i0, 2);
