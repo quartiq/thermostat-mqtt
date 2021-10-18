@@ -3,7 +3,7 @@ use log::{error, info, warn};
 
 use crate::{
     adc::{Adc, AdcPins},
-    dac::{Dacs, Dac0Pins, Dac1Pins, Pwms},
+    dac::{Dac0Pins, Dac1Pins, Dacs, Pwms},
     leds::Leds,
 };
 
@@ -18,9 +18,9 @@ use smoltcp_nal::smoltcp::{
 use stm32_eth::{
     hal::delay::Delay,
     hal::gpio::{gpioe::*, GpioExt},
+    hal::hal::{digital::v2::OutputPin, PwmPin},
     hal::rcc::RccExt,
     hal::time::{MegaHertz, U32Ext},
-    hal::hal::{PwmPin, digital::v2::OutputPin},
     stm32::{CorePeripherals, Interrupt, Peripherals, SYST},
     {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
 };
@@ -113,7 +113,7 @@ pub struct Thermostat {
     pub leds: Leds,
     pub adc: Adc,
     pub dacs: Dacs,
-    pub pwms: Pwms
+    pub pwms: Pwms,
 }
 
 pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> Thermostat {
@@ -310,36 +310,39 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     let mut dacs = Dacs::new(clocks, dp.SPI4, dp.SPI5, dac0_pins, dac1_pins);
 
     let mut pwms = Pwms::new(
-        clocks, tim1, tim3,
-        gpioc.pc6, gpioc.pc7,
-        gpioe.pe9, gpioe.pe11,
-        gpioe.pe13, gpioe.pe14,
+        clocks,
+        tim1,
+        tim3,
+        gpioc.pc6,
+        gpioc.pc7,
+        gpioe.pe9,
+        gpioe.pe11,
+        gpioe.pe13,
+        gpioe.pe14,
         gpioe.pe10.into_push_pull_output(),
         gpioe.pe15.into_push_pull_output(),
     );
 
     let _ = pwms.shdn0.set_high();
     let _ = pwms.shdn1.set_high();
-    pwms.set(0.5, 0);   // max_v0
-    pwms.set(0.5, 1);   // max_v1
-    pwms.set(0.5, 2);   // max_i_pos0
-    pwms.set(0.5, 3);   // max_i_pos1
-    pwms.set(0.5, 4);   // max_i_neg0
-    pwms.set(0.5, 5);   // max_i_neg1
-
+    pwms.set(0.5, 0); // max_v0
+    pwms.set(0.5, 1); // max_v1
+    pwms.set(0.5, 2); // max_i_pos0
+    pwms.set(0.5, 3); // max_i_pos1
+    pwms.set(0.5, 4); // max_i_neg0
+    pwms.set(0.5, 5); // max_i_neg1
 
     dacs.set(0x1ffff, 0);
     dacs.set(0x1ffff, 1);
 
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
-    
 
     let mut thermostat = Thermostat {
         network_devices,
         leds,
         adc,
         dacs,
-        pwms
+        pwms,
     };
 
     thermostat
