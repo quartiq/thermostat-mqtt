@@ -20,9 +20,9 @@ const MAXI: f32 = 3.0;
 
 // DAC constants
 const R_SENSE: f32 = 0.05;
-const VREF_TEC: f32 = 1.5;
+pub const VREF_TEC: f32 = 1.5;
 const MAXCODE: f32 = 262144.0;
-const VREF_DAC: f32 = 3.025;
+pub const VREF_DAC: f32 = 3.025;
 const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 
 // IIR constants
@@ -41,7 +41,7 @@ pub fn adc_to_temp(adc: u32) -> f32 {
 
 pub fn i_to_dac(i: f32) -> u32 {
     let v = (i * 10.0 * R_SENSE) + VREF_TEC;
-    log::info!("{:?}", v);
+    log::info!("v_set{:?}", v);
     ((v * MAXCODE) / VREF_DAC) as u32
 }
 
