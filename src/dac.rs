@@ -21,7 +21,6 @@ use stm32_eth::hal::{
 };
 
 use crate::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
-use crate::PwmSettings;
 
 /// SPI Mode 1
 pub const SPI_MODE: spi::Mode = spi::Mode {
@@ -123,20 +122,28 @@ impl Pwms {
             0 => set(&mut self.max_v0, v_to_pwm(val)),
             1 => set(&mut self.max_v1, v_to_pwm(val)),
             2 => set(&mut self.max_i_pos0, i_to_pwm(val)),
-            4 => set(&mut self.max_i_neg0, i_to_pwm(val)),
-            3 => set(&mut self.max_i_pos1, i_to_pwm(val)),
+            3 => set(&mut self.max_i_neg0, i_to_pwm(val)),
+            4 => set(&mut self.max_i_pos1, i_to_pwm(val)),
             5 => set(&mut self.max_i_neg1, i_to_pwm(val)),
             _ => unreachable!(),
         }
     }
 
-    pub fn set_all(&mut self, set0: PwmSettings, set1: PwmSettings) {
-        self.set(set0.max_v, 0);
-        self.set(set1.max_v, 1);
-        self.set(set0.max_i_pos, 2);
-        self.set(set1.max_i_pos, 3);
-        self.set(set0.max_i_neg, 4);
-        self.set(set1.max_i_neg, 5);
+    pub fn set_all(
+        &mut self,
+        min_i0: f32,
+        max_i0: f32,
+        max_v0: f32,
+        min_i1: f32,
+        max_i1: f32,
+        max_v1: f32,
+    ) {
+        self.set(max_v0, 0);
+        self.set(max_v1, 1);
+        self.set(max_i0, 2);
+        self.set(min_i0, 3);
+        self.set(max_i1, 4);
+        self.set(min_i1, 5);
     }
 }
 

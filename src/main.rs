@@ -10,7 +10,9 @@ mod telemetry;
 mod unit_conversion;
 use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::{Telemetry, TelemetryBuffer};
-use unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset};
+use unit_conversion::{
+    adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset, VREF_DAC, VREF_TEC,
+};
 
 mod adc;
 mod dac;
@@ -38,14 +40,14 @@ const IIR_CASCADE_LENGTH: usize = 1;
 const LED_PERIOD: u32 = 1 << 25;
 const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
 const SCALE: f32 = 8388608.0;
-const OUTSCALE: f32 = 131072.0;
+const OUTSCALE: f32 = 131072.0 * VREF_TEC / (VREF_DAC / 2.0); // zero current is slightly off center
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct PidSettings {
     pub pid: [f32; 3],
     pub target: f32,
-    pub min: f32,
-    pub max: f32,
+    pub max_i_neg: f32,
+    pub max_i_pos: f32,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
@@ -57,13 +59,6 @@ pub struct AdcFilterSettings {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
-pub struct PwmSettings {
-    pub max_i_pos: f32,
-    pub max_i_neg: f32,
-    pub max_v: f32,
-}
-
-#[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct Settings {
     telemetry_period: f32,
     led: bool,
@@ -71,7 +66,7 @@ pub struct Settings {
     pidsettings: [PidSettings; 2],
     engage_iir: [bool; 2],
     adcsettings: AdcFilterSettings,
-    pwmsettings: [PwmSettings; 2],
+    max_v_tec: [f32; 2],
 }
 
 impl Default for Settings {
@@ -82,35 +77,24 @@ impl Default for Settings {
             dacs: [0.0, 0.0],
             engage_iir: [false, false],
             adcsettings: AdcFilterSettings {
-                odr: 0b10000,   // 10Hz output data rate
+                odr: 0b10101,   // 10Hz output data rate
                 order: 0,       // Sinc5+Sinc1 filter
                 enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
                 enhfilten: 1,   // enable postfilter
             },
-            pwmsettings: [
-                PwmSettings {
-                    max_i_pos: 0.5,
-                    max_i_neg: 0.5,
-                    max_v: 0.5,
-                },
-                PwmSettings {
-                    max_i_pos: 0.5,
-                    max_i_neg: 0.5,
-                    max_v: 0.5,
-                },
-            ],
+            max_v_tec: [1.0, 1.0],
             pidsettings: [
                 PidSettings {
                     pid: [1.0, 0., 0.],
                     target: 25.0,
-                    min: -SCALE,
-                    max: SCALE,
+                    max_i_neg: 0.1,
+                    max_i_pos: 0.1,
                 },
                 PidSettings {
                     pid: [1.0, 0., 0.],
                     target: 25.0,
-                    min: -SCALE,
-                    max: SCALE,
+                    max_i_neg: 0.1,
+                    max_i_pos: 0.1,
                 },
             ],
         }
@@ -181,7 +165,7 @@ const APP: () = {
         let telemetry = c.resources.telemetry;
         let settings = c.resources.settings;
 
-        let mut y: [u32; 2] = [0, 0];
+        let mut y: [i32; 2] = [0, 0];
 
         for ch in 0..adcdata.len() {
             y[ch] = iirs[ch]
@@ -189,11 +173,12 @@ const APP: () = {
                 .zip(iir_state[ch].iter_mut())
                 .fold(adcdata[ch] as f64, |yi, (iir_ch, state)| {
                     iir_ch.update(state, yi, false)
-                }) as u32;
+                }) as i32;
             if settings.engage_iir[ch] {
-                dacs.set(y[ch], ch as u8);
+                dacs.set((y[ch] + OUTSCALE as i32) as u32, ch as u8);
             }
         }
+        info!("oustscale:\t {:?}", dac_to_i(y[1] as u32));
         telemetry.adcs = adcdata;
         telemetry.dacs = dacs.val;
     }
@@ -205,37 +190,37 @@ const APP: () = {
 
         *c.resources.settings = *settings;
 
-        c.resources
-            .adc
-            .set_filters(c.resources.settings.adcsettings);
+        c.resources.adc.set_filters(settings.adcsettings);
 
         c.resources.pwms.set_all(
-            c.resources.settings.pwmsettings[0],
-            c.resources.settings.pwmsettings[1],
+            settings.pidsettings[0].max_i_neg * 1.1, // set to 10% higher than iir limits
+            settings.pidsettings[0].max_i_pos * 1.1, // set to 10% higher than iir limits
+            settings.max_v_tec[0],
+            settings.pidsettings[1].max_i_neg * 1.1, // set to 10% higher than iir limits
+            settings.pidsettings[1].max_i_pos * 1.1, // set to 10% higher than iir limits
+            settings.max_v_tec[1],
         );
 
         for (i, iir) in c.resources.iirs.iter_mut().enumerate() {
             iir[0]
                 .ba
                 .iter_mut()
-                .zip(pid_to_iir(c.resources.settings.pidsettings[i].pid).iter())
+                .zip(pid_to_iir(settings.pidsettings[i].pid).iter())
                 .map(|(d, x)| *d = *x as f64)
                 .last();
-            iir[0]
-                .set_x_offset(temp_to_iiroffset(c.resources.settings.pidsettings[i].target) as f64); // set input offset to target
-            iir[0].y_offset = iir[0].y_offset + OUTSCALE as f64; // add output offset to half range
-            iir[0].y_min = c.resources.settings.pidsettings[i].min as f64;
-            iir[0].y_max = c.resources.settings.pidsettings[i].max as f64;
+            iir[0].set_x_offset(temp_to_iiroffset(settings.pidsettings[i].target) as f64); // set input offset to target
+                                                                                           // iir[0].y_offset = iir[0].y_offset; // add output offset to half range
+            iir[0].y_min = (i_to_dac(-settings.pidsettings[i].max_i_neg) as f32 - OUTSCALE) as f64;
+            iir[0].y_max = (i_to_dac(settings.pidsettings[i].max_i_pos) as f32 - OUTSCALE) as f64;
+            info!("y_min:\t {:?}  y_max:\t {:?}", iir[0].y_min, iir[0].y_max);
         }
 
         log::info!("ba: {:?}", c.resources.iirs[0][0].y_offset);
         // log::info!("x_offset: {:?}", c.resources.iirs[0][0].x_offset);
 
-        for (i, eng) in c.resources.settings.engage_iir.iter_mut().enumerate() {
+        for (i, eng) in settings.engage_iir.iter().enumerate() {
             if !*eng {
-                c.resources
-                    .dacs
-                    .set(i_to_dac(c.resources.settings.dacs[i]), i as u8);
+                c.resources.dacs.set(i_to_dac(settings.dacs[i]), i as u8);
             }
         }
     }

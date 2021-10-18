@@ -15,14 +15,14 @@ const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
 const R_N: f32 = 10000.0;
 
 // PWM constants
-const MAXV: f32 = 4.0 * 3.3;
+const MAXV: f32 = 5.0;
 const MAXI: f32 = 3.0;
 
 // DAC constants
 const R_SENSE: f32 = 0.05;
-const VREF_TEC: f32 = 1.5;
+pub const VREF_TEC: f32 = 1.5;
 const MAXCODE: f32 = 262144.0;
-const VREF_DAC: f32 = 3.0;
+pub const VREF_DAC: f32 = 3.025;
 const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 
 // IIR constants
@@ -34,14 +34,14 @@ pub fn adc_to_temp(adc: u32) -> f64 {
     let vin = data as f64 / (0.75 * SCALE as f64);
     let r = (R_INNER as f64) / ((1.0 / vin) - 1.0);
 
-    // R to T (°C) (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
-    let t_inv = T_N_INV as f64 + (1.0 / B as f64) * (r / R_N as f64).ln();
-    ((1.0 / t_inv) - ZEROK as f64) as f64
+    // R to T (°C)
+    let t_inv = T_N_INV + (1.0 / B) * (r / R_N).ln();
+    ((1.0 / t_inv) - ZEROK) as f32
 }
 
 pub fn i_to_dac(i: f32) -> u32 {
     let v = (i * 10.0 * R_SENSE) + VREF_TEC;
-    log::info!("{:?}", v);
+    log::info!("v_set{:?}", v);
     ((v * MAXCODE) / VREF_DAC) as u32
 }
 
@@ -51,15 +51,15 @@ pub fn dac_to_i(val: u32) -> f32 {
 }
 
 pub fn i_to_pwm(i: f32) -> f32 {
-    MAXI / i
+    i / MAXI
 }
 
 pub fn v_to_pwm(v: f32) -> f32 {
-    MAXV / v
+    v / MAXV
 }
 
 pub fn temp_to_iiroffset(temp: f32) -> f32 {
-    // T (°C) to R (https://www.ametherm.com/thermistor/ntc-thermistors-steinhart-and-hart-equation)
+    // T (°C) to R
     let t_inv = 1.0 / (temp + ZEROK);
     let r = R_N * (B * (t_inv - T_N_INV)).exp();
 
