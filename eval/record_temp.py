@@ -41,7 +41,7 @@ class TelemetryReader:
 
 async def get_tele(telemetry_queue):
     latest_values = await telemetry_queue.get()
-    return latest_values['adcs'][0]
+    return [latest_values['adcs'][0], latest_values['dacs'][0]]
 
 
 def main():
@@ -76,8 +76,8 @@ def main():
     async def record():
         interface = await Miniconf.create(args.prefix, args.broker)
 
-        await interface.command('telemetry_period', 1.6, retain=False)
-        await interface.command('adcsettings/odr', 22, retain=False)
+        await interface.command('telemetry_period', 1.0, retain=False)
+        await interface.command('adcsettings/odr', 18, retain=False)
 
         # fig = plt.figure()
         # ax = fig.add_subplot(1, 1, 1)
@@ -85,11 +85,11 @@ def main():
 
         f = open('adcvals.csv', 'w')
         writer = csv.writer(f)
-        temp = []
+        data = []
         for i in range(MAXLEN):
-            temp.append(await get_tele(telemetry_queue))
-            writer.writerow([temp[i]])
-            print(f'temp: {temp[i]}')
+            data.append(await get_tele(telemetry_queue))
+            writer.writerow([data[i][0], data[i][1]])
+            print(f'temp: {data[i][0]}, curr: {data[i][1]}')
             # ax.clear()
             # ax.plot(temp)
 
