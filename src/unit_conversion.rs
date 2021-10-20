@@ -35,8 +35,8 @@ pub fn adc_to_temp(adc: u32) -> f64 {
     let r = (R_INNER as f64) / ((1.0 / vin) - 1.0);
 
     // R to T (°C)
-    let t_inv = T_N_INV + (1.0 / B) * (r / R_N).ln();
-    ((1.0 / t_inv) - ZEROK) as f32
+    let t_inv = T_N_INV as f64 + (1.0 / B as f64) * (r / R_N as f64).ln();
+    (1.0 / t_inv) - ZEROK as f64
 }
 
 pub fn i_to_dac(i: f32) -> u32 {
