@@ -209,7 +209,7 @@ const APP: () = {
                 .map(|(d, x)| *d = *x as f64)
                 .last();
             iir[0].set_x_offset(temp_to_iiroffset(settings.pidsettings[i].target) as f64); // set input offset to target
-                                                                                           // iir[0].y_offset = iir[0].y_offset; // add output offset to half range
+            // iir[0].y_offset = iir[0].y_offset; // add output offset to half range
             iir[0].y_min = (i_to_dac(-settings.pidsettings[i].max_i_neg) as f32 - OUTSCALE) as f64;
             iir[0].y_max = (i_to_dac(settings.pidsettings[i].max_i_pos) as f32 - OUTSCALE) as f64;
             info!("y_min:\t {:?}  y_max:\t {:?}", iir[0].y_min, iir[0].y_max);

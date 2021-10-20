@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+# odr:1
+
 import matplotlib.pyplot as plt
 from matplotlib.mlab import psd
 import numpy as np
@@ -23,7 +25,7 @@ for row in data:
 
 t = np.linspace(0, len(temp)/3600, len(temp))
 
-temp_psd, freqs = psd((np.array(temp) - T_SET), len(temp), Fs=1)
+temp_psd, freqs = psd((np.array(temp)), len(temp), Fs=1, detrend='mean')
 temp_psd = 10 * np.log10(temp_psd)
 curr_psd, freqs = psd(current, len(temp), Fs=1)
 curr_psd = 10 * np.log10(curr_psd)
@@ -44,6 +46,7 @@ ax.text(0.65, 0.95, text, transform=ax.transAxes,
         verticalalignment='top', horizontalalignment='left', bbox=box)
 ax.set_xlabel('Time (hours)')
 ax.set_ylabel('°C')
+ax.set_xlim(0, max(t))
 
 ax = axs[0][1]
 ax.plot(freqs, temp_psd)
@@ -51,6 +54,7 @@ ax.set_title('Temperature Error PSD')
 ax.grid()
 ax.set_xscale('log')
 ax.set_xlabel('Frequency (hertz)')
+ax.set_xlim(0, max(freqs))
 
 
 ax = axs[1][0]
@@ -67,6 +71,7 @@ ax.text(0.65, 0.05, text, transform=ax.transAxes,
         verticalalignment='bottom', horizontalalignment='left', bbox=box)
 ax.set_xlabel('Time (hours)')
 ax.set_ylabel('mA')
+ax.set_xlim(0, max(t))
 
 
 ax = axs[1][1]
@@ -75,6 +80,7 @@ ax.set_title('TEC Current PSD')
 ax.grid()
 ax.set_xscale('log')
 ax.set_xlabel('Frequency (hertz)')
+ax.set_xlim(0, max(freqs))
 
 
 plt.tight_layout()
