@@ -55,7 +55,7 @@ impl Default for TelemetryBuffer {
 #[derive(Serialize)]
 pub struct Telemetry {
     pub dacs: [f32; 2],
-    pub adcs: [f64; 2],
+    pub adcs: [f32; 2],
 }
 
 impl Default for Telemetry {

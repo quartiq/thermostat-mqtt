@@ -28,7 +28,8 @@ const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 // IIR constants
 const SCALE: u32 = 1 << 23;
 
-pub fn adc_to_temp(adc: u32) -> f64 {
+pub fn adc_to_temp(adc: u32) -> f32 { 
+    // compute with f64 to avoid errors
     // raw to R
     let data = (adc as f64) * (0.5 * 0x400000 as f64 / GAIN as f64);
     let vin = data as f64 / (0.75 * SCALE as f64);
@@ -36,7 +37,7 @@ pub fn adc_to_temp(adc: u32) -> f64 {
 
     // R to T (°C)
     let t_inv = T_N_INV as f64 + (1.0 / B as f64) * (r / R_N as f64).ln();
-    (1.0 / t_inv) - ZEROK as f64
+    ((1.0 / t_inv) - ZEROK as f64) as f32
 }
 
 pub fn i_to_dac(i: f32) -> u32 {
@@ -47,7 +48,13 @@ pub fn i_to_dac(i: f32) -> u32 {
 
 pub fn dac_to_i(val: u32) -> f32 {
     let v = VREF_DAC * (val as f32 / MAXCODE);
-    ((v - VREF_TEC) / (10.0 * R_SENSE)) as f32
+    let i = ((v - VREF_TEC) / (10.0 * R_SENSE)) as f32;
+    // TEMPORARY TO LIMIT DIGITS FOR MQTT-EXPLORER
+    if i > 0.001 {
+        i
+    } else {
+        0.0
+    }
 }
 
 pub fn i_to_pwm(i: f32) -> f32 {
