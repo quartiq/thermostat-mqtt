@@ -88,7 +88,7 @@ def main():
         data = []
         for i in range(MAXLEN):
             data.append(await get_tele(telemetry_queue))
-            writer.writerow([data[i][0], data[i][1]])
+            writer.writerow([data[i][0]])
             print(f'temp: {data[i][0]}, curr: {data[i][1]}')
             # ax.clear()
             # ax.plot(temp)

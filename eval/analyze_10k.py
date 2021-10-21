@@ -11,7 +11,7 @@ plt.rcParams.update({'font.size': 7})
 box = dict(boxstyle='round', facecolor='white', alpha=1.0)
 
 
-f = open('eval/10k_ref.csv', 'r')
+f = open('eval/10k_ref1.csv', 'r')
 data = csv.reader(f, delimiter=',', quoting=csv.QUOTE_NONNUMERIC)
 
 temp = []
@@ -22,7 +22,8 @@ for row in data:
 
 t = np.linspace(0, len(temp)/3600, len(temp))
 
-temp_psd, freqs = psd((np.array(temp) - T_SET), len(temp), Fs=1)
+temp_psd, freqs = psd((np.array(temp) - T_SET),
+                      len(temp), Fs=1, detrend='mean')
 temp_psd = 10 * np.log10(temp_psd)
 
 fig, axs = plt.subplots(2, 1)
