@@ -20,6 +20,8 @@ current = []
 for row in data:
     temp.append(row[0])
 
+temp = temp[:7200]
+
 t = np.linspace(0, len(temp)/3600, len(temp))
 
 temp_psd, freqs = psd((np.array(temp) - T_SET),

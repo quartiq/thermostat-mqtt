@@ -76,8 +76,8 @@ def main():
     async def record():
         interface = await Miniconf.create(args.prefix, args.broker)
 
-        await interface.command('telemetry_period', 1.0, retain=False)
-        await interface.command('adcsettings/odr', 18, retain=False)
+        await interface.command('telemetry_period', 0.1, retain=False)
+        await interface.command('adcsettings/odr', 17, retain=False)
 
         # fig = plt.figure()
         # ax = fig.add_subplot(1, 1, 1)
@@ -88,7 +88,7 @@ def main():
         data = []
         for i in range(MAXLEN):
             data.append(await get_tele(telemetry_queue))
-            writer.writerow([data[i][0]])
+            writer.writerow([data[i][0], data[i][1]])
             print(f'temp: {data[i][0]}, curr: {data[i][1]}')
             # ax.clear()
             # ax.plot(temp)
