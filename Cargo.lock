@@ -188,7 +188,7 @@ dependencies = [
 [[package]]
 name = "derive_miniconf"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/miniconf?branch=rs/issue-56/generic-arrays#f373af5652713f385aa01af5a5d1821d4cba8be8"
+source = "git+https://github.com/quartiq/miniconf#7a18db4ebb00cc8907ce83783afe5f647817fbe5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -334,7 +334,7 @@ dependencies = [
 name = "idsp"
 version = "0.1.0"
 dependencies = [
- "miniconf 0.1.0 (git+https://github.com/quartiq/miniconf?branch=rs/issue-56/generic-arrays)",
+ "miniconf 0.1.0 (git+https://github.com/quartiq/miniconf)",
  "num 0.4.0",
  "num-complex 0.4.0",
  "serde",
@@ -397,9 +397,9 @@ dependencies = [
 [[package]]
 name = "miniconf"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/miniconf?branch=rs/issue-56/generic-arrays#f373af5652713f385aa01af5a5d1821d4cba8be8"
+source = "git+https://github.com/quartiq/miniconf#7a18db4ebb00cc8907ce83783afe5f647817fbe5"
 dependencies = [
- "derive_miniconf 0.1.0 (git+https://github.com/quartiq/miniconf?branch=rs/issue-56/generic-arrays)",
+ "derive_miniconf 0.1.0 (git+https://github.com/quartiq/miniconf)",
  "heapless 0.7.3",
  "log",
  "minimq 0.4.0",

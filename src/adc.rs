@@ -231,7 +231,7 @@ impl Adc {
 
     pub fn set_filters(&mut self, set: AdcFilterSettings) {
         /// Set both ADC channel filter config to the same settings.
-        let reg: u32 = (set.odr | set.order << 4 | set.enhfilt << 7 | set.enhfilten << 10) as u32;
+        let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
         self.write_reg(FILTCON0, 2, reg);
         self.write_reg(FILTCON1, 2, reg);
     }
