@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from miniconf import Miniconf
 from gmqtt import Client as MqttClient
 
-MAXLEN = 10000
+MAXLEN = 1000000
 
 
 class TelemetryReader:
@@ -77,7 +77,7 @@ def main():
         interface = await Miniconf.create(args.prefix, args.broker)
 
         await interface.command('telemetry_period', 0.1, retain=False)
-        await interface.command('adcsettings/odr', 17, retain=False)
+        await interface.command('adcsettings/odr', 17, retain=False)    # 10Hz sample rate with 2 ch
 
         # fig = plt.figure()
         # ax = fig.add_subplot(1, 1, 1)
