@@ -27,6 +27,10 @@ use leds::Leds;
 use stm32_eth;
 
 use stm32_eth::stm32::Peripherals;
+use stm32_eth::{
+    hal::gpio::{gpioe::*, gpiof::*, GpioExt, Output, PushPull},
+    hal::hal::{digital::v2::OutputPin, PwmPin},
+};
 
 use rtic::cyccnt::{Instant, U32Ext as _};
 
@@ -80,7 +84,7 @@ impl Default for Settings {
                 odr: 0b10101,   // 10Hz output data rate
                 order: 0,       // Sinc5+Sinc1 filter
                 enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
-                enhfilten: 1,   // enable postfilter
+                enhfilten: 0,   // disable postfilter
             },
             max_v_tec: [1.0, 1.0],
             pidsettings: [
@@ -114,6 +118,9 @@ const APP: () = {
         network: NetworkUsers<Settings, Telemetry>,
         settings: Settings,
         telemetry: TelemetryBuffer,
+        pf11: PF11<Output<PushPull>>,
+        pf12: PF12<Output<PushPull>>,
+        pf13: PF13<Output<PushPull>>,
     }
 
     // #[init(schedule = [blink, poll_eth])]
@@ -153,11 +160,15 @@ const APP: () = {
             network,
             settings,
             telemetry: TelemetryBuffer::default(),
+            pf11: thermostat.pf11,
+            pf12: thermostat.pf12,
+            pf13: thermostat.pf13,
         }
     }
 
-    #[task(priority=1, resources=[dacs, iir_state, iirs, telemetry, settings])]
+    #[task(priority=1, resources=[dacs, iir_state, iirs, telemetry, settings, pf11])]
     fn process(c: process::Context, adcdata: [u32; 2]) {
+        c.resources.pf11.set_high();
         info!("adcdata:\t {:?}\t {:?}", adcdata[0], adcdata[1]);
         let dacs = c.resources.dacs;
         let iir_state = c.resources.iir_state;
@@ -180,10 +191,12 @@ const APP: () = {
         }
         telemetry.adcs = adcdata;
         telemetry.dacs = dacs.val;
+        c.resources.pf11.set_low();
     }
 
-    #[task(priority = 1, resources=[network, settings, dacs, adc, pwms, iirs])]
+    #[task(priority = 1, resources=[network, settings, dacs, adc, pwms, iirs, pf13])]
     fn settings_update(c: settings_update::Context) {
+        c.resources.pf13.set_high();
         log::info!("updating settings");
         let settings = c.resources.network.miniconf.settings();
 
@@ -222,6 +235,7 @@ const APP: () = {
                 c.resources.dacs.set(i_to_dac(settings.dacs[i]), i as u8);
             }
         }
+        c.resources.pf13.set_low();
     }
 
     #[task(priority = 1, resources = [network], schedule = [poll_eth],  spawn=[settings_update])]
@@ -258,9 +272,10 @@ const APP: () = {
         }
     }
 
-    #[task(priority = 1, resources = [network, telemetry, settings], schedule = [tele])]
+    #[task(priority = 1, resources = [network, telemetry, settings, pf12], schedule = [tele])]
     fn tele(c: tele::Context) {
-        // Wie geht das??: telemetry.dac.iter_mut().zip(yf.iter()).map(|&mut d, &x| *d = i_to_dac(x as f32) as f32).last();
+        c.resources.pf12.set_high();
+
         c.resources.network.telemetry.update();
         c.resources
             .network
@@ -273,6 +288,7 @@ const APP: () = {
                     + ((c.resources.settings.telemetry_period * CYC_PER_S as f32) as u32).cycles(),
             )
             .unwrap();
+        c.resources.pf12.set_low();
     }
 
     #[task(priority = 1, resources = [leds], schedule = [blink])]

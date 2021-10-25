@@ -17,7 +17,7 @@ use smoltcp_nal::smoltcp::{
 
 use stm32_eth::{
     hal::delay::Delay,
-    hal::gpio::{gpioe::*, GpioExt},
+    hal::gpio::{gpioe::*, gpiof::*, GpioExt, Output, PushPull},
     hal::hal::{digital::v2::OutputPin, PwmPin},
     hal::rcc::RccExt,
     hal::time::{MegaHertz, U32Ext},
@@ -114,6 +114,9 @@ pub struct Thermostat {
     pub adc: Adc,
     pub dacs: Dacs,
     pub pwms: Pwms,
+    pub pf11: PF11<Output<PushPull>>,
+    pub pf12: PF12<Output<PushPull>>,
+    pub pf13: PF13<Output<PushPull>>,
 }
 
 pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> Thermostat {
@@ -170,6 +173,13 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
         gpiod.pd10.into_push_pull_output(),
         gpiod.pd11.into_push_pull_output(),
     );
+
+    let mut pf11 = gpiof.pf11.into_push_pull_output();
+    pf11.set_low();
+    let mut pf12 = gpiof.pf12.into_push_pull_output();
+    pf12.set_low();
+    let mut pf13 = gpiof.pf13.into_push_pull_output();
+    pf13.set_low();
 
     for _ in 0..100000 {
         leds.g3.on();
@@ -343,6 +353,9 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
         adc,
         dacs,
         pwms,
+        pf11,
+        pf12,
+        pf13
     };
 
     thermostat
