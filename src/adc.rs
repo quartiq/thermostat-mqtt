@@ -27,30 +27,33 @@ pub const SPI_MODE: spi::Mode = spi::Mode {
 pub const SPI_CLOCK: MegaHertz = MegaHertz(2);
 
 // ADC Register Adresses
-const ID: u8 = 0x7;
-const ADCMODE: u8 = 0x1;
-const IFMODE: u8 = 0x2;
-const DATA: u8 = 0x04;
-const FILTCON0: u8 = 0x28;
-const FILTCON1: u8 = 0x29;
-// const FILTCON2: u8 = 0x2a;
-// const FILTCON3: u8 = 0x2b;
-const CH0: u8 = 0x10;
-const CH1: u8 = 0x11;
-// const CH2: u8 = 0x12;
-// const CH3: u8 = 0x13;
-const SETUPCON0: u8 = 0x20;
-const SETUPCON1: u8 = 0x21;
-// const SETUPCON2: u8 = 0x22;
-// const SETUPCON3: u8 = 0x23;
-// const OFFSET0: u8 = 0x30;
-// const OFFSET1: u8 = 0x31;
-// const OFFSET2: u8 = 0x32;
-// const OFFSET3: u8 = 0x33;
-// const GAIN0: u8 = 0x38;
-// const GAIN1: u8 = 0x39;
-// const GAIN2: u8 = 0x3a;
-// const GAIN3: u8 = 0x3b;
+#[repr(u8)]
+enum AdcReg {
+    ID = 0x7,
+    ADCMODE = 0x1,
+    IFMODE = 0x2,
+    DATA = 0x04,
+    FILTCON0 = 0x28,
+    FILTCON1 = 0x29,
+    FILTCON2 = 0x2a,
+    FILTCON3 = 0x2b,
+    CH0 = 0x10,
+    CH1 = 0x11,
+    CH2 = 0x12,
+    CH3 = 0x13,
+    SETUPCON0 = 0x20,
+    SETUPCON1 = 0x21,
+    SETUPCON2 = 0x22,
+    SETUPCON3 = 0x23,
+    OFFSET0 = 0x30,
+    OFFSET1 = 0x31,
+    OFFSET2 = 0x32,
+    OFFSET3 = 0x33,
+    GAIN0 = 0x38,
+    GAIN1 = 0x39,
+    GAIN2 = 0x3a,
+    GAIN3 = 0x3b,
+}
 
 pub type AdcSpi = Spi<
     SPI2,
@@ -89,13 +92,13 @@ impl Adc {
         };
         adc.reset();
 
-        info!("ADC ID: {:#X}", adc.read_reg(ID, 2));
+        info!("ADC ID: {:#X}", adc.read_reg(AdcReg::ID, 2));
 
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
-        adc.write_reg(ADCMODE, 2, 0x8000);
+        adc.write_reg(AdcReg::ADCMODE, 2, 0x8000);
 
         // Setup IFMODE register. Only enable data stat to get channel info on conversions.
-        adc.write_reg(IFMODE, 2, 0b100_0000);
+        adc.write_reg(AdcReg::IFMODE, 2, 0b100_0000);
 
         adc.setup_channels();
 
@@ -117,8 +120,8 @@ impl Adc {
         };
     }
 
-    fn read_reg(&mut self, addr: u8, size: u8) -> u32 {
-        let mut addr_buf = [addr | 0x40];
+    fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
+        let mut addr_buf = [addr as u8 | 0x40];
         let _ = self.sync.set_low();
         let _ = self.spi.transfer(&mut addr_buf);
         let data = match size {
@@ -148,8 +151,8 @@ impl Adc {
         return data;
     }
 
-    fn write_reg(&mut self, addr: u8, size: u8, data: u32) {
-        let mut addr_buf = [addr];
+    fn write_reg(&mut self, addr: AdcReg, size: u8, data: u32) {
+        let mut addr_buf = [addr as u8];
         let _ = self.sync.set_low();
         let _ = self.spi.transfer(&mut addr_buf);
         match size {
@@ -188,7 +191,7 @@ impl Adc {
     pub fn read_data(&mut self) -> (u32, u8) {
         /// Reads the data register and returns data and channel information.
         /// The DATA_STAT bit has to be set in the IFMODE register.
-        let datach = self.read_reg(DATA, 4);
+        let datach = self.read_reg(AdcReg::DATA, 4);
         let ch = (datach & 0x3) as u8;
         let data = datach >> 8;
         (data, ch)
@@ -198,11 +201,11 @@ impl Adc {
         /// Setup ADC channels.
         // enable first channel and configure Ain0, Ain1,
         // set config 0 for second channel,
-        self.write_reg(CH0, 2, 0x8001);
+        self.write_reg(AdcReg::CH0, 2, 0x8001);
 
         // enable second channel and configure Ain2, Ain3,
         // set config 1 for second channel,
-        self.write_reg(CH1, 2, 0x9043);
+        self.write_reg(AdcReg::CH1, 2, 0x9043);
 
         // Setup configuration register ch0
         let rbp = 1 << 11; // REFBUF+
@@ -211,7 +214,7 @@ impl Adc {
         let abn = 1 << 8; // AINBUF+
         let unip = 0 << 12; // BI_UNIPOLAR
         let refsel = 00 << 4; // REF_SEL
-        self.write_reg(SETUPCON0, 2, rbp | rbn | abp | abn | unip | refsel);
+        self.write_reg(AdcReg::SETUPCON0, 2, rbp | rbn | abp | abn | unip | refsel);
 
         // Setup configuration register ch1
         let rbp = 1 << 11; // REFBUF+
@@ -220,19 +223,19 @@ impl Adc {
         let abn = 1 << 8; // AINBUF+
         let unip = 0 << 12; // BI_UNIPOLAR
         let refsel = 00 << 4; // REF_SEL
-        self.write_reg(SETUPCON1, 2, rbp | rbn | abp | abn | unip | refsel);
+        self.write_reg(AdcReg::SETUPCON1, 2, rbp | rbn | abp | abn | unip | refsel);
 
         // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        self.write_reg(AdcReg::FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
 
         // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
     }
 
     pub fn set_filters(&mut self, set: AdcFilterSettings) {
         /// Set both ADC channel filter config to the same settings.
         let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
-        self.write_reg(FILTCON0, 2, reg);
-        self.write_reg(FILTCON1, 2, reg);
+        self.write_reg(AdcReg::FILTCON0, 2, reg);
+        self.write_reg(AdcReg::FILTCON1, 2, reg);
     }
 }
