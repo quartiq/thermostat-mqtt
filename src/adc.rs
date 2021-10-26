@@ -27,7 +27,7 @@ pub const SPI_MODE: spi::Mode = spi::Mode {
 pub const SPI_CLOCK: MegaHertz = MegaHertz(2);
 
 // ADC Register Adresses
-#[repr(u8)]
+#[allow(unused)]
 enum AdcReg {
     ID = 0x7,
     ADCMODE = 0x1,
@@ -53,6 +53,18 @@ enum AdcReg {
     GAIN1 = 0x39,
     GAIN2 = 0x3a,
     GAIN3 = 0x3b,
+}
+
+// ADC SETUPCON register settings
+#[allow(unused)]
+enum Setupcon {
+    REFBUF_P = 1 << 11,    // REFBUF+
+    REFBUF_N = 1 << 10,    // REFBUF-
+    AINBUF_P = 1 << 9,     // AINBUF+
+    AINBUF_N = 1 << 8,     // AINBUF-
+    BI_UNIPOLAR = 1 << 12, // BI_UNIPOLAR
+    INT_REF = 10 << 4,     // Internal 2,5V reference
+    DIA_REF = 11 << 4,     // diagnostic reference
 }
 
 pub type AdcSpi = Spi<
@@ -121,30 +133,14 @@ impl Adc {
     }
 
     fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
-        let mut addr_buf = [addr as u8 | 0x40];
+        let mut buf = [addr as u8 | 0x40, 0, 0, 0, 0];
         let _ = self.sync.set_low();
-        let _ = self.spi.transfer(&mut addr_buf);
+        self.spi.transfer(&mut buf[..(size + 1) as usize]).unwrap();
         let data = match size {
-            1 => {
-                let mut buf = [0];
-                let raw = self.spi.transfer(&mut buf);
-                raw.unwrap()[0].clone() as u32
-            }
-            2 => {
-                let mut buf = [0, 0];
-                let raw = self.spi.transfer(&mut buf);
-                BigEndian::read_u16(raw.unwrap()) as u32
-            }
-            3 => {
-                let mut buf = [0, 0, 0];
-                let raw = self.spi.transfer(&mut buf);
-                BigEndian::read_u24(raw.unwrap()) as u32
-            }
-            4 => {
-                let mut buf = [0, 0, 0, 0];
-                let raw = self.spi.transfer(&mut buf);
-                BigEndian::read_u32(raw.unwrap()) as u32
-            }
+            1 => buf[1].clone() as u32,
+            2 => BigEndian::read_u16(&buf[1..3]) as u32,
+            3 => BigEndian::read_u24(&buf[1..4]) as u32,
+            4 => BigEndian::read_u32(&buf[1..5]) as u32,
             _ => 0,
         };
         let _ = self.sync.set_high();
@@ -153,8 +149,12 @@ impl Adc {
 
     fn write_reg(&mut self, addr: AdcReg, size: u8, data: u32) {
         let mut addr_buf = [addr as u8];
-        let _ = self.sync.set_low();
-        let _ = self.spi.transfer(&mut addr_buf);
+        self.sync.set_low().unwrap();
+        self.spi.transfer(&mut addr_buf).unwrap();
+        // for s in 0..size {
+        //     let mut buf = [(data >> (s * 8)) as u8];
+        //     self.spi.transfer(&mut buf).unwrap();
+        // }
         match size {
             1 => {
                 let mut buf = [data as u8];
@@ -208,22 +208,28 @@ impl Adc {
         self.write_reg(AdcReg::CH1, 2, 0x9043);
 
         // Setup configuration register ch0
-        let rbp = 1 << 11; // REFBUF+
-        let rbn = 1 << 10; // REFBUF-
-        let abp = 1 << 9; // AINBUF-
-        let abn = 1 << 8; // AINBUF+
-        let unip = 0 << 12; // BI_UNIPOLAR
-        let refsel = 00 << 4; // REF_SEL
-        self.write_reg(AdcReg::SETUPCON0, 2, rbp | rbn | abp | abn | unip | refsel);
+        self.write_reg(
+            AdcReg::SETUPCON0,
+            2,
+            Setupcon::REFBUF_P as u32
+                | Setupcon::REFBUF_N as u32
+                | Setupcon::AINBUF_P as u32
+                | Setupcon::AINBUF_N as u32,
+            // Unipolar
+            // External Reference
+        );
 
         // Setup configuration register ch1
-        let rbp = 1 << 11; // REFBUF+
-        let rbn = 1 << 10; // REFBUF-
-        let abp = 1 << 9; // AINBUF-
-        let abn = 1 << 8; // AINBUF+
-        let unip = 0 << 12; // BI_UNIPOLAR
-        let refsel = 00 << 4; // REF_SEL
-        self.write_reg(AdcReg::SETUPCON1, 2, rbp | rbn | abp | abn | unip | refsel);
+        self.write_reg(
+            AdcReg::SETUPCON1,
+            2,
+            Setupcon::REFBUF_P as u32
+                | Setupcon::REFBUF_N as u32
+                | Setupcon::AINBUF_P as u32
+                | Setupcon::AINBUF_N as u32,
+            // Unipolar
+            // External Reference
+        );
 
         // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
         self.write_reg(AdcReg::FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
