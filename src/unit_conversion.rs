@@ -1,4 +1,5 @@
-// Thermostat unit and description conversion
+// Thermostat unit and data description conversion
+// SingularitySurfer 2021
 
 use core::f32;
 use num_traits::float::Float;
