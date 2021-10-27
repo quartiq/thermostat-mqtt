@@ -11,7 +11,7 @@ mod unit_conversion;
 use network_users::{NetworkState, NetworkUsers, UpdateState};
 use telemetry::{Telemetry, TelemetryBuffer};
 use unit_conversion::{
-    adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset, VREF_DAC, VREF_TEC,
+    adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset, MAXI, VREF_DAC, VREF_TEC,
 };
 
 mod adc;
@@ -193,11 +193,12 @@ const APP: () = {
         c.resources.adc.set_filters(settings.adcsettings);
 
         c.resources.pwms.set_all(
-            settings.pidsettings[0].max_i_neg * 1.1, // set to 10% higher than iir limits
-            settings.pidsettings[0].max_i_pos * 1.1, // set to 10% higher than iir limits
+            // set currents to 5% of max higher in order to avoid railing the driver before the filter.
+            settings.pidsettings[0].max_i_neg + (0.05 * MAXI),
+            settings.pidsettings[0].max_i_pos + (0.05 * MAXI),
             settings.max_v_tec[0],
-            settings.pidsettings[1].max_i_neg * 1.1, // set to 10% higher than iir limits
-            settings.pidsettings[1].max_i_pos * 1.1, // set to 10% higher than iir limits
+            settings.pidsettings[1].max_i_neg + (0.05 * MAXI),
+            settings.pidsettings[1].max_i_pos + (0.05 * MAXI),
             settings.max_v_tec[1],
         );
 

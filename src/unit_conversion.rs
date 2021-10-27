@@ -16,7 +16,7 @@ const R_N: f32 = 10000.0; // TEC resistance at 25°C
 
 // PWM constants
 const MAXV: f32 = 5.0; // maximum voltage configurable for TEC driver
-const MAXI: f32 = 3.0; // maximum current configurable for TEC driver
+pub const MAXI: f32 = 3.0; // maximum current configurable for TEC driver
 
 // DAC constants
 const R_SENSE: f32 = 0.05; // TEC current sense resistor
