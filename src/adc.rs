@@ -8,7 +8,7 @@ use log::{error, info, warn};
 
 use stm32_eth::hal::{
     gpio::{gpiob::*, Alternate, GpioExt, Output, PushPull, AF5},
-    hal::{blocking::spi::Transfer, digital::v2::OutputPin},
+    hal::{blocking::spi::Transfer, blocking::spi::Write, digital::v2::OutputPin},
     rcc::Clocks,
     spi,
     spi::Spi,
@@ -134,7 +134,7 @@ impl Adc {
 
     fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
         let mut buf = [addr as u8 | 0x40, 0, 0, 0, 0];
-        let _ = self.sync.set_low();
+        self.sync.set_low().unwrap();
         self.spi.transfer(&mut buf[..(size + 1) as usize]).unwrap();
         let data = match size {
             1 => buf[1].clone() as u32,
@@ -150,32 +150,15 @@ impl Adc {
     fn write_reg(&mut self, addr: AdcReg, size: u8, data: u32) {
         let mut addr_buf = [addr as u8];
         self.sync.set_low().unwrap();
-        self.spi.transfer(&mut addr_buf).unwrap();
-        // for s in 0..size {
-        //     let mut buf = [(data >> (s * 8)) as u8];
-        //     self.spi.transfer(&mut buf).unwrap();
-        // }
+        self.spi.write(&mut addr_buf).unwrap();
+        let mut buf = [0, 0, 0, 0];
+        BigEndian::write_u32(&mut buf, data);
         match size {
-            1 => {
-                let mut buf = [data as u8];
-                let _ = self.spi.transfer(&mut buf);
-            }
-            2 => {
-                let mut buf = [0, 0];
-                BigEndian::write_u16(&mut buf, data as u16);
-                let _ = self.spi.transfer(&mut buf);
-            }
-            3 => {
-                let mut buf = [0, 0, 0];
-                BigEndian::write_u24(&mut buf, data as u32);
-                let _ = self.spi.transfer(&mut buf);
-            }
-            4 => {
-                let mut buf = [0, 0, 0, 0];
-                BigEndian::write_u32(&mut buf, data as u32);
-                let _ = self.spi.transfer(&mut buf);
-            }
-            _ => {}
+            1 => self.spi.transfer(&mut buf[3..4]).unwrap(),
+            2 => self.spi.transfer(&mut buf[2..4]).unwrap(),
+            3 => self.spi.transfer(&mut buf[1..4]).unwrap(),
+            4 => self.spi.transfer(&mut buf[0..4]).unwrap(),
+            _ => &[0],
         };
         let _ = self.sync.set_high();
     }
@@ -188,17 +171,17 @@ impl Adc {
         addr_buf[0]
     }
 
+    /// Reads the data register and returns data and channel information.
+    /// The DATA_STAT bit has to be set in the IFMODE register.
     pub fn read_data(&mut self) -> (u32, u8) {
-        /// Reads the data register and returns data and channel information.
-        /// The DATA_STAT bit has to be set in the IFMODE register.
         let datach = self.read_reg(AdcReg::DATA, 4);
         let ch = (datach & 0x3) as u8;
         let data = datach >> 8;
         (data, ch)
     }
 
+    /// Setup ADC channels.
     fn setup_channels(&mut self) {
-        /// Setup ADC channels.
         // enable first channel and configure Ain0, Ain1,
         // set config 0 for second channel,
         self.write_reg(AdcReg::CH0, 2, 0x8001);
@@ -237,9 +220,8 @@ impl Adc {
         // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
         self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
     }
-
+    /// Set both ADC channel filter config to the same settings.
     pub fn set_filters(&mut self, set: AdcFilterSettings) {
-        /// Set both ADC channel filter config to the same settings.
         let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
         self.write_reg(AdcReg::FILTCON0, 2, reg);
         self.write_reg(AdcReg::FILTCON1, 2, reg);
