@@ -90,7 +90,7 @@ pub struct Adc {
 
 impl Adc {
     pub fn new(clocks: Clocks, spi2: SPI2, mut pins: AdcPins) -> Self {
-        let _ = pins.sync.set_high();
+        pins.sync.set_high().unwrap();
         let spi = Spi::spi2(
             spi2,
             (pins.sck, pins.miso, pins.mosi),
@@ -119,9 +119,9 @@ impl Adc {
 
     pub fn reset(&mut self) {
         let mut buf = [0xFFu8; 8];
-        let _ = self.sync.set_low();
+        self.sync.set_low().unwrap();
         let result = self.spi.transfer(&mut buf);
-        let _ = self.sync.set_high();
+        self.sync.set_high().unwrap();
         match result {
             Err(e) => {
                 warn!("ADC reset failed! {:?}", e)
@@ -143,7 +143,7 @@ impl Adc {
             4 => BigEndian::read_u32(&buf[1..5]) as u32,
             _ => 0,
         };
-        let _ = self.sync.set_high();
+        self.sync.set_high().unwrap();
         return data;
     }
 
@@ -160,14 +160,14 @@ impl Adc {
             4 => self.spi.transfer(&mut buf[0..4]).unwrap(),
             _ => &[0],
         };
-        let _ = self.sync.set_high();
+        self.sync.set_high().unwrap();
     }
 
     pub fn get_status_reg(&mut self) -> u8 {
         let mut addr_buf = [0];
-        let _ = self.sync.set_low();
-        let _ = self.spi.transfer(&mut addr_buf);
-        let _ = self.sync.set_high();
+        self.sync.set_low().unwrap();
+        self.spi.transfer(&mut addr_buf).unwrap();
+        self.sync.set_high().unwrap();
         addr_buf[0]
     }
 
