@@ -4,10 +4,10 @@
 
 use byteorder::{BigEndian, ByteOrder};
 use core::fmt;
-use log::{error, info, warn};
+use log::{info, warn};
 
 use stm32_eth::hal::{
-    gpio::{gpiob::*, Alternate, GpioExt, Output, PushPull, AF5},
+    gpio::{gpiob::*, Alternate, Output, PushPull, AF5},
     hal::{blocking::spi::Transfer, blocking::spi::Write, digital::v2::OutputPin},
     rcc::Clocks,
     spi,
@@ -58,13 +58,13 @@ enum AdcReg {
 // ADC SETUPCON register settings
 #[allow(unused)]
 enum Setupcon {
-    REFBUF_P = 1 << 11,    // REFBUF+
-    REFBUF_N = 1 << 10,    // REFBUF-
-    AINBUF_P = 1 << 9,     // AINBUF+
-    AINBUF_N = 1 << 8,     // AINBUF-
-    BI_UNIPOLAR = 1 << 12, // BI_UNIPOLAR
-    INT_REF = 10 << 4,     // Internal 2,5V reference
-    DIA_REF = 11 << 4,     // diagnostic reference
+    REFBUFP = 1 << 11,    // REFBUF+
+    REFBUFN = 1 << 10,    // REFBUF-
+    AINBUFP = 1 << 9,     // AINBUF+
+    AINBUFN = 1 << 8,     // AINBUF-
+    BIUNIPOLAR = 1 << 12, // BI_UNIPOLAR
+    INTREF = 10 << 4,     // Internal 2,5V reference
+    DIAREF = 11 << 4,     // diagnostic reference
 }
 
 pub type AdcSpi = Spi<
@@ -117,9 +117,10 @@ impl Adc {
         adc
     }
 
+    /// Reset ADC.
     pub fn reset(&mut self) {
         let mut buf = [0xFFu8; 8];
-        self.sync.set_low().unwrap();
+        // self.sync.set_low().unwrap();
         let result = self.spi.transfer(&mut buf);
         self.sync.set_high().unwrap();
         match result {
@@ -132,6 +133,7 @@ impl Adc {
         };
     }
 
+    /// Read a ADC register of size in bytes.
     fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
         let mut buf = [addr as u8 | 0x40, 0, 0, 0, 0];
         self.sync.set_low().unwrap();
@@ -147,6 +149,7 @@ impl Adc {
         return data;
     }
 
+    /// Write a ADC register of size in bytes.
     fn write_reg(&mut self, addr: AdcReg, size: u8, data: u32) {
         let mut addr_buf = [addr as u8];
         self.sync.set_low().unwrap();
@@ -163,6 +166,7 @@ impl Adc {
         self.sync.set_high().unwrap();
     }
 
+    /// Reads the status register and returns the value.
     pub fn get_status_reg(&mut self) -> u8 {
         let mut addr_buf = [0];
         self.sync.set_low().unwrap();
@@ -194,10 +198,10 @@ impl Adc {
         self.write_reg(
             AdcReg::SETUPCON0,
             2,
-            Setupcon::REFBUF_P as u32
-                | Setupcon::REFBUF_N as u32
-                | Setupcon::AINBUF_P as u32
-                | Setupcon::AINBUF_N as u32,
+            Setupcon::REFBUFP as u32
+                | Setupcon::REFBUFN as u32
+                | Setupcon::AINBUFP as u32
+                | Setupcon::AINBUFN as u32,
             // Unipolar
             // External Reference
         );
@@ -206,10 +210,10 @@ impl Adc {
         self.write_reg(
             AdcReg::SETUPCON1,
             2,
-            Setupcon::REFBUF_P as u32
-                | Setupcon::REFBUF_N as u32
-                | Setupcon::AINBUF_P as u32
-                | Setupcon::AINBUF_N as u32,
+            Setupcon::REFBUFP as u32
+                | Setupcon::REFBUFN as u32
+                | Setupcon::AINBUFP as u32
+                | Setupcon::AINBUFN as u32,
             // Unipolar
             // External Reference
         );
