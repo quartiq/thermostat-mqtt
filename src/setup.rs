@@ -119,7 +119,6 @@ pub struct Thermostat {
 pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> Thermostat {
     let mut cp = core;
     cp.SCB.enable_icache();
-    // cp.SCB.enable_dcache(&mut cp.CPUID);
     cp.DCB.enable_trace();
     cp.DWT.enable_cycle_counter();
 
@@ -227,14 +226,8 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
 
     let neighbor_cache = smoltcp::iface::NeighborCache::new(&mut store.neighbor_cache[..]);
 
-    // let i = match store.ip_addrs[0].address() {
-    //     IpAddress::Ipv4(addr) => addr,
-    //     _ => unreachable!(),
-    // };
-
     let mut routes = Routes::new(&mut store.routes_cache[..]);
     routes
-        // .add_default_ipv4_route(i)
         .add_default_ipv4_route(Ipv4Address::UNSPECIFIED)
         .unwrap();
 
@@ -281,9 +274,9 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     };
 
     info!("Setup network stack");
-    let mut stack = smoltcp_nal::NetworkStack::new(interface, sockets);
+    let stack = smoltcp_nal::NetworkStack::new(interface, sockets);
 
-    let mut network_devices = NetworkDevices {
+    let network_devices = NetworkDevices {
         stack,
         mac_address: ethernet_addr,
     };
@@ -307,7 +300,7 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
         sync: gpiof.pf6.into_push_pull_output(),
     };
 
-    let mut dacs = Dacs::new(clocks, dp.SPI4, dp.SPI5, dac0_pins, dac1_pins);
+    let dacs = Dacs::new(clocks, dp.SPI4, dp.SPI5, dac0_pins, dac1_pins);
 
     let mut pwms = Pwms::new(
         clocks,
@@ -323,21 +316,12 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
         gpioe.pe15.into_push_pull_output(),
     );
 
-    let _ = pwms.shdn0.set_high();
-    let _ = pwms.shdn1.set_high();
-    pwms.set(0.5, 0); // max_v0
-    pwms.set(0.5, 1); // max_v1
-    pwms.set(0.5, 2); // max_i_pos0
-    pwms.set(0.5, 3); // max_i_pos1
-    pwms.set(0.5, 4); // max_i_neg0
-    pwms.set(0.5, 5); // max_i_neg1
-
-    dacs.set(0x1ffff, 0);
-    dacs.set(0x1ffff, 1);
+    pwms.shdn0.set_high().unwrap();
+    pwms.shdn1.set_high().unwrap();
 
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
 
-    let mut thermostat = Thermostat {
+    let thermostat = Thermostat {
         network_devices,
         leds,
         adc,
