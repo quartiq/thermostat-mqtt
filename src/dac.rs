@@ -106,7 +106,8 @@ impl Pwms {
         }
     }
 
-    pub fn set(&mut self, val: f32, ch: u8) {
+    /// Set PWM channel to relative dutycycle.
+    pub fn set(&mut self, duty: f32, ch: u8) {
         fn set<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
             let duty = i_to_pwm(duty);
             let max = pin.get_max_duty();
@@ -114,16 +115,17 @@ impl Pwms {
             pin.set_duty(value);
         }
         match ch {
-            0 => set(&mut self.max_v0, v_to_pwm(val)),
-            1 => set(&mut self.max_v1, v_to_pwm(val)),
-            2 => set(&mut self.max_i_pos0, i_to_pwm(val)),
-            3 => set(&mut self.max_i_neg0, i_to_pwm(val)),
-            4 => set(&mut self.max_i_pos1, i_to_pwm(val)),
-            5 => set(&mut self.max_i_neg1, i_to_pwm(val)),
+            0 => set(&mut self.max_v0, duty),
+            1 => set(&mut self.max_v1, duty),
+            2 => set(&mut self.max_i_pos0, duty),
+            3 => set(&mut self.max_i_neg0, duty),
+            4 => set(&mut self.max_i_pos1, duty),
+            5 => set(&mut self.max_i_neg1, duty),
             _ => unreachable!(),
         }
     }
 
+    /// set all
     pub fn set_all(
         &mut self,
         min_i0: f32,
@@ -133,12 +135,12 @@ impl Pwms {
         max_i1: f32,
         max_v1: f32,
     ) {
-        self.set(max_v0, 0);
-        self.set(max_v1, 1);
-        self.set(max_i0, 2);
-        self.set(min_i0, 3);
-        self.set(max_i1, 4);
-        self.set(min_i1, 5);
+        self.set(i_to_pwm(max_v0), 0);
+        self.set(i_to_pwm(max_v1), 1);
+        self.set(i_to_pwm(max_i0), 2);
+        self.set(i_to_pwm(min_i0), 3);
+        self.set(i_to_pwm(max_i1), 4);
+        self.set(i_to_pwm(min_i1), 5);
     }
 }
 
