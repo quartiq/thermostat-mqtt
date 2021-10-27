@@ -1,11 +1,10 @@
-// Thermostat DAC/PWM driver
+// Thermostat DAC/TEC driver
 //
 // This file contains all of the drivers to convert an 18 bit word to an analog current.
-// On Thermostat this used the ad5680 DAC and the MAX1968 PWM TEC driver.
+// On Thermostat this used the ad5680 DAC and the MAX1968 PWM TEC driver. The (analog voltage)
+// max output voltages/current settings are driven by PWMs of the STM32.
 // SingularitySurfer 2021
 
-use byteorder::{BigEndian, ByteOrder};
-use core::fmt;
 use cortex_m::asm::delay;
 use log::{error, info, warn};
 
@@ -20,7 +19,7 @@ use stm32_eth::hal::{
     time::{MegaHertz, U32Ext},
 };
 
-use crate::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
+use crate::unit_conversion::{i_to_pwm, v_to_pwm};
 
 /// SPI Mode 1
 pub const SPI_MODE: spi::Mode = spi::Mode {
@@ -28,11 +27,9 @@ pub const SPI_MODE: spi::Mode = spi::Mode {
     phase: spi::Phase::CaptureOnSecondTransition,
 };
 
-pub const SPI_CLOCK: MegaHertz = MegaHertz(30);
-
-pub const MAX_VALUE: u32 = 0x3FFFF;
-
-pub const MAX_DUTY: u16 = 0xffff;
+pub const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
+pub const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
+pub const F_PWM: u32 = 20; // PWM freq in kHz
 
 pub type Dac0Spi = Spi<SPI4, (PE2<Alternate<AF5>>, NoMiso, PE6<Alternate<AF5>>)>;
 
@@ -75,14 +72,12 @@ impl Pwms {
         shdn0: PE10<Output<PushPull>>,
         shdn1: PE15<Output<PushPull>>,
     ) -> Pwms {
-        let freq = 20u32.khz();
-
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
             pin.enable();
         }
         let channels = (max_v0.into_alternate_af2(), max_v1.into_alternate_af2());
-        let (mut max_v0, mut max_v1) = pwm::tim3(tim3, channels, clocks, freq);
+        let (mut max_v0, mut max_v1) = pwm::tim3(tim3, channels, clocks, F_PWM.khz());
         init_pwm_pin(&mut max_v0);
         init_pwm_pin(&mut max_v1);
 
@@ -93,7 +88,7 @@ impl Pwms {
             max_i_neg1.into_alternate_af1(),
         );
         let (mut max_i_pos0, mut max_i_pos1, mut max_i_neg0, mut max_i_neg1) =
-            pwm::tim1(tim1, channels, clocks, freq);
+            pwm::tim1(tim1, channels, clocks, F_PWM.khz());
         init_pwm_pin(&mut max_i_pos0);
         init_pwm_pin(&mut max_i_neg0);
         init_pwm_pin(&mut max_i_pos1);
