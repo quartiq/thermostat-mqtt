@@ -3,7 +3,6 @@
 // SingularitySurfer 2021
 
 use byteorder::{BigEndian, ByteOrder};
-use core::fmt;
 use log::{info, warn};
 
 use stm32_eth::hal::{
@@ -55,7 +54,7 @@ enum AdcReg {
     GAIN3 = 0x3b,
 }
 
-// ADC SETUPCON register settings
+// ADC SETUPCON register settings.
 #[allow(unused)]
 enum Setupcon {
     REFBUFP = 1 << 11,    // REFBUF+
@@ -224,6 +223,7 @@ impl Adc {
         // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
         self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
     }
+
     /// Set both ADC channel filter config to the same settings.
     pub fn set_filters(&mut self, set: AdcFilterSettings) {
         let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
