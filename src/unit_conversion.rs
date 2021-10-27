@@ -29,6 +29,7 @@ const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 // IIR constants
 const SCALE: f32 = (1 << 23) as _; // half the ADC maximum dataword
 
+/// Convert raw adc code to temperature in °C.
 pub fn adc_to_temp(adc: u32) -> f32 {
     // raw to R
     let data = (adc as f32) * (0.5 * 0x400000 as f32 / GAIN as f32);
@@ -40,24 +41,32 @@ pub fn adc_to_temp(adc: u32) -> f32 {
     (1.0 / t_inv) - ZEROK
 }
 
+/// Convert TEC drive current to dac code.
 pub fn i_to_dac(i: f32) -> u32 {
     let v = (i * 10.0 * R_SENSE) + VREF_TEC;
     ((v * MAXCODE) / VREF_DAC) as u32
 }
 
+/// Convert dac code to TEC drive current.
 pub fn dac_to_i(val: u32) -> f32 {
     let v = VREF_DAC * (val as f32 / MAXCODE);
     (v - VREF_TEC) / (10.0 * R_SENSE)
 }
 
+/// Convert maximum current to relative pulsewidth for the (analog voltage)
+/// max output current inputs of the TEC driver.
 pub fn i_to_pwm(i: f32) -> f32 {
     i / MAXI
 }
 
+/// Convert maximum voltage to relative pulsewidth for the (analog voltage)
+/// max output voltage of the TEC driver.
 pub fn v_to_pwm(v: f32) -> f32 {
     v / MAXV
 }
 
+/// Convert a temperature in °C to an effective adc code. This can be used to
+/// compute an effective input iir offset.
 pub fn temp_to_iiroffset(temp: f32) -> f32 {
     // T (°C) to R
     let t_inv = 1.0 / (temp + ZEROK);
@@ -69,6 +78,7 @@ pub fn temp_to_iiroffset(temp: f32) -> f32 {
     (-data * GAIN as f32) / (0.5 * 0x400000 as f32)
 }
 
+/// Convert PID controller gains [kp, ki, kd] to IIR coefficients.
 pub fn pid_to_iir(pid: [f32; 3]) -> [f32; 5] {
     let kp = pid[0] * DATAWIDTH_GAIN;
     let ki = pid[1] * DATAWIDTH_GAIN;
