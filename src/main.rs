@@ -243,7 +243,6 @@ const APP: () = {
 
     #[task(priority = 1, resources = [network, telemetry, settings], schedule = [tele])]
     fn tele(c: tele::Context) {
-        c.resources.network.telemetry.update();
         c.resources
             .network
             .telemetry

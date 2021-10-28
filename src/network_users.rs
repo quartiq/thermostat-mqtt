@@ -1,40 +1,26 @@
-///!  network management module
+///!  Thermostat network management module
+///! Adapted from Stabilizer (https://github.com/quartiq/stabilizer)  
 ///!
 ///! # Design
-///! The stabilizer network architecture supports numerous layers to permit transmission of
-///! telemetry (via MQTT), configuration of run-time settings (via MQTT + Miniconf), and live data
-///! streaming over raw UDP/TCP sockets. This module encompasses the main processing routines
+///! The network architecture supports numerous layers to permit transmission of
+///! telemetry (via MQTT), configuration of run-time settings (via MQTT + Miniconf).
+///  This module encompasses the main processing routines
 ///! related to networking operations.
 pub use heapless;
 pub use miniconf;
 pub use serde;
 
-// pub mod data_stream;
-// pub mod messages;
-// pub mod miniconf_client;
-// pub mod shared;
-// pub mod telemetry;
-
 use crate::setup::NetworkStack;
-// use data_stream::{BlockGenerator, DataStream};
-use minimq::embedded_nal::IpAddr;
-// use network_processor::NetworkProcessor;
 use crate::shared::NetworkManager;
 use crate::telemetry::TelemetryClient;
+use minimq::embedded_nal::IpAddr;
 
 use core::fmt::Write;
 use heapless::String;
 use miniconf::Miniconf;
 use serde::Serialize;
-use smoltcp_nal::embedded_nal::SocketAddr;
 
 pub type NetworkReference = crate::shared::NetworkStackProxy<'static, NetworkStack>;
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum UpdateState {
-    NoChange,
-    Updated,
-}
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum NetworkState {
@@ -46,9 +32,6 @@ pub enum NetworkState {
 pub struct NetworkUsers<S: Default + Miniconf, T: Serialize> {
     pub miniconf: miniconf::MqttClient<S, NetworkReference>,
     stackref: NetworkReference,
-    // pub processor: NetworkProcessor,
-    // stream: DataStream,
-    // generator: Option<FrameGenerator>,
     pub telemetry: TelemetryClient<T>,
 }
 
@@ -71,20 +54,12 @@ where
     /// A new struct of network users.
     pub fn new(
         stack: NetworkStack,
-        // phy: EthernetPhy,
-        // cycle_counter: CycleCounter,
         app: &str,
         mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
         broker: IpAddr,
     ) -> Self {
         let stack_manager =
             cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
-
-        // let processor = NetworkProcessor::new(
-        //     stack_manager.acquire_stack(),
-        //     phy,
-        //     cycle_counter,
-        // );
 
         let prefix = get_device_prefix(app, mac);
 
@@ -103,18 +78,12 @@ where
             broker,
         );
 
-        // let (generator, stream) =
-        //     data_stream::setup_streaming(stack_manager.acquire_stack());
-
         let stackref = stack_manager.acquire_stack();
 
         NetworkUsers {
             miniconf: settings,
             stackref,
-            // processor,
             telemetry,
-            // stream,
-            // generator: Some(generator),
         }
     }
 
@@ -123,14 +92,9 @@ where
     /// # Returns
     /// An indication if any of the network users indicated a state change.
     pub fn update(&mut self, now: u32) -> NetworkState {
-        // // Update the MQTT clients.
-        // self.telemetry.update();
-        //
-        // // Update the data stream.
-        // if self.generator.is_none() {
-        //     self.stream.process();
-        // }
-        //
+        // Update the MQTT clients.
+        self.telemetry.update();
+
         // Poll for incoming data.
         let poll_result = match self.stackref.lock(|stack| stack.poll(now)) {
             Ok(true) => NetworkState::Updated,
