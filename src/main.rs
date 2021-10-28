@@ -1,44 +1,37 @@
 #![no_std]
 #![no_main]
 
-use cortex_m::asm::delay;
-use log::{error, info, warn};
+use log::info;
 use panic_halt as _;
-
-mod network_users;
-mod telemetry;
-mod unit_conversion;
-use network_users::{NetworkState, NetworkUsers, UpdateState};
-use telemetry::{Telemetry, TelemetryBuffer};
-use unit_conversion::{
-    adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset, MAXI, VREF_DAC, VREF_TEC,
-};
 
 mod adc;
 mod dac;
 mod leds;
+mod network_users;
 mod setup;
+mod shared;
+mod telemetry;
+mod unit_conversion;
 
 use adc::Adc;
 use dac::{Dacs, Pwms};
 use idsp::iir;
 use leds::Leds;
 
+use miniconf::Miniconf;
+use network_users::{NetworkState, NetworkUsers};
+use rtic::cyccnt::U32Ext as _;
+use serde::Deserialize;
 use stm32_eth;
-
 use stm32_eth::stm32::Peripherals;
-
-use rtic::cyccnt::{Instant, U32Ext as _};
-
-pub mod shared;
-
-pub use miniconf::{Miniconf, MiniconfAtomic};
-pub use num_traits;
-pub use serde::Deserialize;
+use telemetry::{Telemetry, TelemetryBuffer};
+use unit_conversion::{
+    dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset, MAXI, VREF_DAC, VREF_TEC,
+};
 
 const IIR_CASCADE_LENGTH: usize = 1;
 const LED_PERIOD: u32 = 1 << 25;
-const CYC_PER_S: u32 = 168_000_000; // clock is 168MHz
+const CYC_PER_S: u32 = 168_000_000; // 168MHz main clock
 const SCALE: f32 = 8388608.0;
 const OUTSCALE: f32 = 131072.0 * VREF_TEC / (VREF_DAC / 2.0); // zero current is slightly off center
 
