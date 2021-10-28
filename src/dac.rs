@@ -6,7 +6,6 @@
 // SingularitySurfer 2021
 
 use cortex_m::asm::delay;
-use log::{error, info, warn};
 
 use stm32_eth::hal::{
     gpio::{gpioc::*, gpioe::*, gpiof::*, Alternate, Output, PushPull, AF5},
@@ -19,7 +18,7 @@ use stm32_eth::hal::{
     time::{MegaHertz, U32Ext},
 };
 
-use crate::unit_conversion::{i_to_pwm, v_to_pwm};
+use crate::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
 
 /// SPI Mode 1
 pub const SPI_MODE: spi::Mode = spi::Mode {
@@ -125,7 +124,7 @@ impl Pwms {
         }
     }
 
-    /// set all
+    /// set all PWM oututs to specified min/max currents
     pub fn set_all(
         &mut self,
         min_i0: f32,
@@ -135,8 +134,8 @@ impl Pwms {
         max_i1: f32,
         max_v1: f32,
     ) {
-        self.set(i_to_pwm(max_v0), 0);
-        self.set(i_to_pwm(max_v1), 1);
+        self.set(v_to_pwm(max_v0), 0);
+        self.set(v_to_pwm(max_v1), 1);
         self.set(i_to_pwm(max_i0), 2);
         self.set(i_to_pwm(min_i0), 3);
         self.set(i_to_pwm(max_i1), 4);
@@ -155,13 +154,7 @@ pub struct Dacs {
 }
 
 impl Dacs {
-    pub fn new(
-        clocks: Clocks,
-        spi4: SPI4,
-        spi5: SPI5,
-        mut pins0: Dac0Pins,
-        mut pins1: Dac1Pins,
-    ) -> Self {
+    pub fn new(clocks: Clocks, spi4: SPI4, spi5: SPI5, pins0: Dac0Pins, pins1: Dac1Pins) -> Self {
         let spi0 = Spi::spi4(
             spi4,
             (pins0.sck, NoMiso, pins0.mosi),
@@ -184,32 +177,33 @@ impl Dacs {
             spi1,
             sync1: pins1.sync,
         };
-        let _ = dacs.sync0.set_low();
-        let _ = dacs.sync1.set_low();
+        dacs.sync0.set_low().unwrap();
+        dacs.sync1.set_low().unwrap();
 
-        dacs.set(0x1ffff, 0);
-        dacs.set(0x1ffff, 1);
-
+        // default to zero amps
+        dacs.set(i_to_dac(0.0), 0);
+        dacs.set(i_to_dac(0.0), 1);
         dacs
     }
 
+    /// Set the DAC output to value on a channel.
     pub fn set(&mut self, value: u32, ch: u8) {
         let value = value.min(MAX_VALUE);
         // 24 bit transfer. First 6 bit and last 2 bit are low.
         let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
         if ch == 0 {
-            let _ = self.sync0.set_high();
+            self.sync0.set_high().unwrap();
             // must be high for >= 33 ns
-            delay(1000); // 100 * 5.95ns
-            let _ = self.sync0.set_low();
-            let _ = self.spi0.transfer(&mut buf);
+            delay(100); // 100 * 5.95ns
+            self.sync0.set_low().unwrap();
+            self.spi0.transfer(&mut buf).unwrap();
             self.val[0] = value;
         } else {
-            let _ = self.sync1.set_high();
+            self.sync1.set_high().unwrap();
             // must be high for >= 33 ns
-            delay(1000); // 100 * 5.95ns
-            let _ = self.sync1.set_low();
-            let _ = self.spi1.transfer(&mut buf);
+            delay(100); // 100 * 5.95ns
+            self.sync1.set_low().unwrap();
+            self.spi1.transfer(&mut buf).unwrap();
             self.val[1] = value;
         }
     }
