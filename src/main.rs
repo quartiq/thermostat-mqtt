@@ -25,13 +25,12 @@ use serde::Deserialize;
 use stm32_eth;
 use stm32_eth::stm32::Peripherals;
 use telemetry::{Telemetry, TelemetryBuffer};
-use unit_conversion::{
-    dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset, MAXI, VREF_DAC, VREF_TEC,
-};
+use unit_conversion::{i_to_dac, pid_to_iir, temp_to_iiroffset, MAXI, VREF_DAC, VREF_TEC};
 
 const IIR_CASCADE_LENGTH: usize = 1; // Number of concatenated IIRs. Settings only support one right now.
 const CYC_PER_S: u32 = 168_000_000; // 168MHz main clock
 const LED_PERIOD: u32 = CYC_PER_S / 2; // LED blinking period
+const ETH_P_PERIOD: u32 = CYC_PER_S / 1000; // Ethernet polling period
 const OUTSCALE: f32 = 131072.0 * VREF_TEC / (VREF_DAC / 2.0); // Output scale. Zero current is slightly off center.
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
@@ -127,7 +126,9 @@ const APP: () = {
         let settings = Settings::default();
 
         c.schedule.blink(c.start + LED_PERIOD.cycles()).unwrap();
-        c.schedule.poll_eth(c.start + 168000.cycles()).unwrap();
+        c.schedule
+            .poll_eth(c.start + ETH_P_PERIOD.cycles())
+            .unwrap();
         c.schedule.tele(c.start + CYC_PER_S.cycles()).unwrap();
 
         // apply default settings
@@ -217,7 +218,9 @@ const APP: () = {
             NetworkState::NoChange => {}
         }
         *NOW = *NOW + 1;
-        c.schedule.poll_eth(c.scheduled + 168000.cycles()).unwrap();
+        c.schedule
+            .poll_eth(c.scheduled + ETH_P_PERIOD.cycles())
+            .unwrap();
     }
 
     #[idle(resources=[adc], spawn=[process])]
