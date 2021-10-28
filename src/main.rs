@@ -222,18 +222,19 @@ const APP: () = {
 
     #[idle(resources=[adc], spawn=[process])]
     fn idle(mut c: idle::Context) -> ! {
-        let (mut adcdata0, mut adcdata1) = (0, 0); // initialize both to zero in case ch0 comes first
+        let adcdata1 = 0; // initialize to zero in case ch0 comes first
         loop {
             let statreg = c.resources.adc.lock(|adc| adc.get_status_reg());
             if statreg != 0xff {
                 let (adcdata, ch) = c.resources.adc.lock(|adc| adc.read_data());
                 match ch {
                     0 => {
-                        adcdata1 = adcdata;
+                        #[allow(unused)]
+                        let adcdata1 = adcdata;
                     }
                     _ => {
-                        // ADC ch1 is thermostat ch0
-                        adcdata0 = adcdata;
+                        // ADC ch1 is Thermostat ch0
+                        let adcdata0 = adcdata;
                         c.spawn.process([adcdata0, adcdata1]).unwrap();
                     }
                 }
