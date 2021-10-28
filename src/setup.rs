@@ -106,7 +106,15 @@ pub struct Thermostat {
     pub pwms: Pwms,
 }
 
-pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> Thermostat {
+pub fn setup(core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> Thermostat {
+    // setup Logger
+    static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
+    rtt_target::rtt_init_print!();
+    log::set_logger(&LOGGER)
+        .map(|()| log::set_max_level(log::LevelFilter::Trace))
+        .unwrap();
+    info!("---Starting Setup");
+
     let mut cp = core;
     cp.SCB.enable_icache();
     cp.DCB.enable_trace();
@@ -132,14 +140,6 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
         .pclk2(64.mhz())
         .freeze();
 
-    // setup Logger
-    static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
-    rtt_target::rtt_init_print!();
-    log::set_logger(&LOGGER)
-        .map(|()| log::set_max_level(log::LevelFilter::Trace))
-        .unwrap();
-    log::trace!("Starting");
-
     // take gpios
     let gpioa = dp.GPIOA.split();
     let gpiob = dp.GPIOB.split();
@@ -152,23 +152,15 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     let tim1 = dp.TIM1;
     let tim3 = dp.TIM3;
 
-    log::trace!("waiting a bit");
-
     let mut leds = Leds::new(
         gpiod.pd9,
         gpiod.pd10.into_push_pull_output(),
         gpiod.pd11.into_push_pull_output(),
     );
 
-    for _ in 0..100000 {
-        leds.g3.on();
-        leds.g3.off();
-    }
-
     leds.r1.on();
     leds.g3.on();
     leds.g4.off();
-    log::trace!("waited a bit");
 
     // Setup ethernet.
     info!("Setup ethernet");
@@ -310,6 +302,9 @@ pub fn setup(mut core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals)
     pwms.shdn1.set_high().unwrap();
 
     let adc = Adc::new(clocks, dp.SPI2, adc_pins);
+
+    leds.r1.off();
+    info!("---Setup Done");
 
     let thermostat = Thermostat {
         network_devices,

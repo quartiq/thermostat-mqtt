@@ -121,8 +121,6 @@ const APP: () = {
     fn init(c: init::Context) -> init::LateResources {
         let mut thermostat = setup::setup(c.core, c.device);
 
-        log::info!("setup done");
-
         let network = NetworkUsers::new(
             thermostat.network_devices.stack,
             env!("CARGO_BIN_NAME"),
@@ -143,7 +141,7 @@ const APP: () = {
 
         // apply default settings
         c.spawn.settings_update().unwrap();
-        log::info!("init done");
+        log::info!("---Init Done");
         init::LateResources {
             leds: thermostat.leds,
             adc: thermostat.adc,
