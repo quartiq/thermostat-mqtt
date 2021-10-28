@@ -108,10 +108,9 @@ const APP: () = {
         telemetry: TelemetryBuffer,
     }
 
-    // #[init(schedule = [blink, poll_eth])]
     #[init(schedule = [blink, poll_eth, process, tele], spawn = [settings_update])]
     fn init(c: init::Context) -> init::LateResources {
-        let mut thermostat = setup::setup(c.core, c.device);
+        let thermostat = setup::setup(c.core, c.device);
 
         let network = NetworkUsers::new(
             thermostat.network_devices.stack,
@@ -148,27 +147,24 @@ const APP: () = {
 
     #[task(priority=1, resources=[dacs, iir_state, iirs, telemetry, settings])]
     fn process(c: process::Context, adcdata: [u32; 2]) {
-        info!("adcdata:\t {:?}\t {:?}", adcdata[0], adcdata[1]);
+        info!("adcdata:\t ch0: {:?}\t ch1: {:?}", adcdata[0], adcdata[1]);
         let dacs = c.resources.dacs;
         let iir_state = c.resources.iir_state;
         let iirs = c.resources.iirs;
         let telemetry = c.resources.telemetry;
         let settings = c.resources.settings;
 
-        let mut y: [i32; 2] = [0, 0];
-
         for ch in 0..adcdata.len() {
-            y[ch] = iirs[ch]
+            let y = iirs[ch]
                 .iter()
                 .zip(iir_state[ch].iter_mut())
                 .fold(adcdata[ch] as f64, |yi, (iir_ch, state)| {
                     iir_ch.update(state, yi, false)
-                }) as i32;
+                });
             if settings.engage_iir[ch] {
-                dacs.set((y[ch] + OUTSCALE as i32) as u32, ch as u8);
+                dacs.set((y + OUTSCALE as f64) as u32, ch as u8);
             }
         }
-        info!("oustscale:\t {:?}", dac_to_i(y[1] as u32));
         telemetry.adcs = adcdata;
         telemetry.dacs = dacs.val;
     }
@@ -199,15 +195,10 @@ const APP: () = {
                 .zip(pid_to_iir(settings.pidsettings[i].pid).iter())
                 .map(|(d, x)| *d = *x as f64)
                 .last();
-            iir[0].set_x_offset(temp_to_iiroffset(settings.pidsettings[i].target) as f64); // set input offset to target
-                                                                                           // iir[0].y_offset = iir[0].y_offset; // add output offset to half range
+            iir[0].set_x_offset(temp_to_iiroffset(settings.pidsettings[i].target) as f64); // set output offset to input target
             iir[0].y_min = (i_to_dac(-settings.pidsettings[i].max_i_neg) as f32 - OUTSCALE) as f64;
             iir[0].y_max = (i_to_dac(settings.pidsettings[i].max_i_pos) as f32 - OUTSCALE) as f64;
-            info!("y_min:\t {:?}  y_max:\t {:?}", iir[0].y_min, iir[0].y_max);
         }
-
-        log::info!("ba: {:?}", c.resources.iirs[0][0].y_offset);
-        // log::info!("x_offset: {:?}", c.resources.iirs[0][0].x_offset);
 
         for (i, eng) in settings.engage_iir.iter().enumerate() {
             if !*eng {
@@ -231,7 +222,7 @@ const APP: () = {
 
     #[idle(resources=[adc], spawn=[process])]
     fn idle(mut c: idle::Context) -> ! {
-        let (mut adcdata0, mut adcdata1) = (0, 0);
+        let (mut adcdata0, mut adcdata1) = (0, 0); // initialize both to zero in case ch0 comes first
         loop {
             let statreg = c.resources.adc.lock(|adc| adc.get_status_reg());
             if statreg != 0xff {
@@ -252,7 +243,6 @@ const APP: () = {
 
     #[task(priority = 1, resources = [network, telemetry, settings], schedule = [tele])]
     fn tele(c: tele::Context) {
-        // Wie geht das??: telemetry.dac.iter_mut().zip(yf.iter()).map(|&mut d, &x| *d = i_to_dac(x as f32) as f32).last();
         c.resources.network.telemetry.update();
         c.resources
             .network
