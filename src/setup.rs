@@ -1,5 +1,4 @@
-//use panic_halt as _;
-use log::{error, info, warn};
+use log::info;
 
 use crate::{
     adc::{Adc, AdcPins},
@@ -9,19 +8,15 @@ use crate::{
 
 use smoltcp_nal::smoltcp;
 use smoltcp_nal::smoltcp::{
-    iface::{Interface, InterfaceBuilder, Neighbor, NeighborCache, Routes},
-    socket::{SocketHandle, SocketSetItem, TcpSocket, TcpSocketBuffer},
-    // time::Instant,
+    iface::{InterfaceBuilder, Routes},
     wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address},
 };
 
 use stm32_eth::{
-    hal::delay::Delay,
-    hal::gpio::{gpioe::*, GpioExt},
-    hal::hal::{digital::v2::OutputPin, PwmPin},
+    hal::gpio::GpioExt,
+    hal::hal::digital::v2::OutputPin,
     hal::rcc::RccExt,
     hal::time::{MegaHertz, U32Ext},
-    stm32::{CorePeripherals, Interrupt, Peripherals, SYST},
     {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
 };
 
@@ -29,22 +24,16 @@ use rtt_logger::RTTLogger;
 
 const HSE: MegaHertz = MegaHertz(8);
 
-use rtic::cyccnt::{Instant, U32Ext as _};
-
 type Eth = stm32_eth::Eth<'static, 'static>;
 
-// const SRC_MAC: [u8; 6] = [0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF];
-// const SRC_MAC: [u8; 6] = [0xF6, 0x48, 0x74, 0xC8, 0xC4, 0x83];
-const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1a]; // eeprom
+const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1a];
 
-const NUM_TCP_SOCKETS: usize = 4;
-const NUM_UDP_SOCKETS: usize = 1;
+const NUM_TCP_SOCKETS: usize = 2;
+const NUM_UDP_SOCKETS: usize = 0;
 const NUM_SOCKETS: usize = NUM_UDP_SOCKETS + NUM_TCP_SOCKETS;
 
 pub struct NetStorage {
     pub ip_addrs: [smoltcp::wire::IpCidr; 1],
-
-    // Note: There is an additional socket set item required for the DHCP socket.
     pub sockets: [Option<smoltcp::socket::SocketSetItem<'static>>; NUM_SOCKETS],
     pub tcp_socket_storage: [TcpSocketStorage; NUM_TCP_SOCKETS],
     pub udp_socket_storage: [UdpSocketStorage; NUM_UDP_SOCKETS],
@@ -52,6 +41,7 @@ pub struct NetStorage {
     pub routes_cache: [Option<(smoltcp::wire::IpCidr, smoltcp::iface::Route)>; 4],
 }
 
+#[derive(Copy, Clone)]
 pub struct UdpSocketStorage {
     rx_storage: [u8; 128],
     tx_storage: [u8; 128],
@@ -94,7 +84,7 @@ impl Default for NetStorage {
             )],
             neighbor_cache: [None; 4],
             routes_cache: [None; 4],
-            sockets: [None, None, None, None, None],
+            sockets: [None, None],
             tcp_socket_storage: [TcpSocketStorage::new(); NUM_TCP_SOCKETS],
             udp_socket_storage: [UdpSocketStorage::new(); NUM_UDP_SOCKETS],
         }
