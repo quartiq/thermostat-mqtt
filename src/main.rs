@@ -29,11 +29,10 @@ use unit_conversion::{
     dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset, MAXI, VREF_DAC, VREF_TEC,
 };
 
-const IIR_CASCADE_LENGTH: usize = 1;
-const LED_PERIOD: u32 = 1 << 25;
+const IIR_CASCADE_LENGTH: usize = 1; // Number of concatenated IIRs. Settings only support one right now.
 const CYC_PER_S: u32 = 168_000_000; // 168MHz main clock
-const SCALE: f32 = 8388608.0;
-const OUTSCALE: f32 = 131072.0 * VREF_TEC / (VREF_DAC / 2.0); // zero current is slightly off center
+const LED_PERIOD: u32 = CYC_PER_S / 2; // LED blinking period
+const OUTSCALE: f32 = 131072.0 * VREF_TEC / (VREF_DAC / 2.0); // Output scale. Zero current is slightly off center.
 
 #[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
 pub struct PidSettings {
@@ -140,7 +139,7 @@ const APP: () = {
             adc: thermostat.adc,
             dacs: thermostat.dacs,
             pwms: thermostat.pwms,
-            iirs: [[iir::IIR::new(1., (-SCALE).into(), SCALE.into()); IIR_CASCADE_LENGTH]; 2],
+            iirs: [[iir::IIR::new(1., 0.0, 0.0); IIR_CASCADE_LENGTH]; 2],
             network,
             settings,
             telemetry: TelemetryBuffer::default(),
