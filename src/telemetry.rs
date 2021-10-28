@@ -1,4 +1,5 @@
-///! Stabilizer Telemetry Capabilities
+///! Thermostat Telemetry Capabilities
+///! Adapted from Stabilizer (https://github.com/quartiq/stabilizer)  
 ///!
 ///! # Design
 ///! Telemetry is reported regularly using an MQTT client. All telemetry is reported in SI units
@@ -15,8 +16,7 @@ use minimq::QoS;
 use serde::Serialize;
 
 use crate::network_users::NetworkReference;
-// use crate::hardware::{adc::AdcCode, afe::Gain, dac::DacCode};
-use crate::unit_conversion::{adc_to_temp, dac_to_i, i_to_dac, pid_to_iir, temp_to_iiroffset};
+use crate::unit_conversion::{adc_to_temp, dac_to_i};
 use minimq::embedded_nal::IpAddr;
 
 /// The telemetry client for reporting telemetry data over MQTT.
@@ -119,7 +119,6 @@ impl<T: Serialize> TelemetryClient<T> {
     pub fn publish(&mut self, telemetry: &T) {
         let telemetry: Vec<u8, 256> = serde_json_core::to_vec(telemetry).unwrap();
 
-        // log::info!("{:?}", telemetry);
         self.mqtt
             .client
             .publish(&self.telemetry_topic, &telemetry, QoS::AtMostOnce, &[])
