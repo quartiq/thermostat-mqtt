@@ -14,7 +14,6 @@ use smoltcp_nal::smoltcp::{
 
 use stm32_eth::{
     hal::gpio::GpioExt,
-    hal::hal::digital::v2::OutputPin,
     hal::rcc::RccExt,
     hal::time::{MegaHertz, U32Ext},
     {EthPins, PhyAddress, RingEntry, RxDescriptor, TxDescriptor},
@@ -277,32 +276,21 @@ pub fn setup(core: rtic::Peripherals, device: stm32_eth::stm32::Peripherals) -> 
         sck: gpioe.pe2.into_alternate_af5(),
         mosi: gpioe.pe6.into_alternate_af5(),
         sync: gpioe.pe4.into_push_pull_output(),
+        shdn: gpioe.pe10.into_push_pull_output(),
     };
 
     let dac1_pins = Dac1Pins {
         sck: gpiof.pf7.into_alternate_af5(),
         mosi: gpiof.pf9.into_alternate_af5(),
         sync: gpiof.pf6.into_push_pull_output(),
+        shdn: gpioe.pe15.into_push_pull_output(),
     };
 
     let dacs = Dacs::new(clocks, dp.SPI4, dp.SPI5, dac0_pins, dac1_pins);
 
-    let mut pwms = Pwms::new(
-        clocks,
-        tim1,
-        tim3,
-        gpioc.pc6,
-        gpioc.pc7,
-        gpioe.pe9,
-        gpioe.pe11,
-        gpioe.pe13,
-        gpioe.pe14,
-        gpioe.pe10.into_push_pull_output(),
-        gpioe.pe15.into_push_pull_output(),
+    let pwms = Pwms::new(
+        clocks, tim1, tim3, gpioc.pc6, gpioc.pc7, gpioe.pe9, gpioe.pe11, gpioe.pe13, gpioe.pe14,
     );
-
-    pwms.shdn0.set_high().unwrap();
-    pwms.shdn1.set_high().unwrap();
 
     leds.r1.off();
     info!("---Setup Done");

@@ -36,6 +36,7 @@ pub struct Dac0Pins {
     pub sck: PE2<Alternate<AF5>>,
     pub mosi: PE6<Alternate<AF5>>,
     pub sync: PE4<Output<PushPull>>,
+    pub shdn: PE10<Output<PushPull>>,
 }
 
 pub type Dac1Spi = Spi<SPI5, (PF7<Alternate<AF5>>, NoMiso, PF9<Alternate<AF5>>)>;
@@ -44,6 +45,7 @@ pub struct Dac1Pins {
     pub sck: PF7<Alternate<AF5>>,
     pub mosi: PF9<Alternate<AF5>>,
     pub sync: PF6<Output<PushPull>>,
+    pub shdn: PE15<Output<PushPull>>,
 }
 
 pub struct Pwms {
@@ -53,8 +55,6 @@ pub struct Pwms {
     pub max_i_pos1: PwmChannels<TIM1, pwm::C2>,
     pub max_i_neg0: PwmChannels<TIM1, pwm::C3>,
     pub max_i_neg1: PwmChannels<TIM1, pwm::C4>,
-    pub shdn0: PE10<Output<PushPull>>,
-    pub shdn1: PE15<Output<PushPull>>,
 }
 
 impl Pwms {
@@ -68,8 +68,6 @@ impl Pwms {
         max_i_pos1: PE11<M4>,
         max_i_neg0: PE13<M5>,
         max_i_neg1: PE14<M6>,
-        shdn0: PE10<Output<PushPull>>,
-        shdn1: PE15<Output<PushPull>>,
     ) -> Pwms {
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
@@ -100,8 +98,6 @@ impl Pwms {
             max_i_pos1,
             max_i_neg0,
             max_i_neg1,
-            shdn0,
-            shdn1,
         }
     }
 
@@ -151,6 +147,8 @@ pub struct Dacs {
     pub val: [u32; 2],
     spi1: Dac1Spi,
     sync1: PF6<Output<PushPull>>,
+    shdn0: PE10<Output<PushPull>>,
+    shdn1: PE15<Output<PushPull>>,
 }
 
 impl Dacs {
@@ -176,7 +174,12 @@ impl Dacs {
             val: [0, 0],
             spi1,
             sync1: pins1.sync,
+            shdn0: pins0.shdn,
+            shdn1: pins1.shdn,
         };
+        dacs.dis_ch(0);
+        dacs.dis_ch(1);
+
         dacs.sync0.set_low().unwrap();
         dacs.sync1.set_low().unwrap();
 
@@ -205,6 +208,24 @@ impl Dacs {
             self.sync1.set_low().unwrap();
             self.spi1.transfer(&mut buf).unwrap();
             self.val[1] = value;
+        }
+    }
+
+    /// enable a TEC channel via shutdown pin.
+    pub fn en_ch(&mut self, ch: u8) {
+        if ch == 0 {
+            self.shdn0.set_high().unwrap();
+        } else {
+            self.shdn1.set_high().unwrap();
+        }
+    }
+
+    /// disable a TEC channel via shutdown pin.
+    pub fn dis_ch(&mut self, ch: u8) {
+        if ch == 0 {
+            self.shdn0.set_low().unwrap();
+        } else {
+            self.shdn1.set_low().unwrap();
         }
     }
 }

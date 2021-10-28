@@ -204,6 +204,14 @@ const APP: () = {
         for (i, eng) in settings.engage_iir.iter().enumerate() {
             if !*eng {
                 c.resources.dacs.set(i_to_dac(settings.dacs[i]), i as u8);
+                // disable channel if set to zero current and iir not engaged
+                if settings.dacs[i] == 0.0 {
+                    c.resources.dacs.dis_ch(i as u8);
+                } else {
+                    c.resources.dacs.en_ch(i as u8);
+                }
+            } else {
+                c.resources.dacs.en_ch(i as u8);
             }
         }
     }
