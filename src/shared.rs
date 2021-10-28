@@ -1,4 +1,5 @@
 ///! Network Stack Sharing Utilities
+///! Adapted from Stabilizer (https://github.com/quartiq/stabilizer)  
 ///!
 ///! # Design
 ///! This module provides a mechanism for sharing a single network stack safely between drivers
