@@ -176,19 +176,9 @@ dependencies = [
 
 [[package]]
 name = "derive_miniconf"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1622cf1dddfe55eaa54a5223dae7de264d40110080bc55c6d8a9d89daf882d05"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "derive_miniconf"
-version = "0.1.0"
-source = "git+https://github.com/quartiq/miniconf#7a18db4ebb00cc8907ce83783afe5f647817fbe5"
+checksum = "a09410a9472600744ed45ab245fc56bce9c44a422434cf91cad613ac5857f93c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -231,7 +221,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7a4b4d10ac48d08bfe3db7688c402baadb244721f30a77ce360bd24c3dffe58"
 dependencies = [
- "num 0.3.1",
+ "num",
 ]
 
 [[package]]
@@ -334,9 +324,9 @@ dependencies = [
 name = "idsp"
 version = "0.1.0"
 dependencies = [
- "miniconf 0.1.0 (git+https://github.com/quartiq/miniconf)",
- "num 0.4.0",
+ "miniconf 0.2.0",
  "num-complex 0.4.0",
+ "num-traits",
  "serde",
 ]
 
@@ -386,7 +376,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbb9f957ca15c9f2fc59d2ee1016029822ed1bddd622bcbaefac9c8b2499bb4a"
 dependencies = [
- "derive_miniconf 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "derive_miniconf",
  "heapless 0.7.3",
  "log",
  "minimq 0.3.0",
@@ -396,10 +386,11 @@ dependencies = [
 
 [[package]]
 name = "miniconf"
-version = "0.1.0"
-source = "git+https://github.com/quartiq/miniconf#7a18db4ebb00cc8907ce83783afe5f647817fbe5"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1052ead57d31cf73a64ed51f8c8be77ed266fae44b62addbf84f086d30e725f7"
 dependencies = [
- "derive_miniconf 0.1.0 (git+https://github.com/quartiq/miniconf)",
+ "derive_miniconf",
  "heapless 0.7.3",
  "log",
  "minimq 0.4.0",
@@ -460,7 +451,7 @@ dependencies = [
  "idsp",
  "log",
  "mcp23017",
- "miniconf 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miniconf 0.1.0",
  "minimq 0.2.0",
  "mutex-trait",
  "num-traits",
@@ -516,20 +507,7 @@ dependencies = [
  "num-complex 0.3.1",
  "num-integer",
  "num-iter",
- "num-rational 0.3.2",
- "num-traits",
-]
-
-[[package]]
-name = "num"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
-dependencies = [
- "num-complex 0.4.0",
- "num-integer",
- "num-iter",
- "num-rational 0.4.0",
+ "num-rational",
  "num-traits",
 ]
 
@@ -578,17 +556,6 @@ name = "num-rational"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
-dependencies = [
- "autocfg",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-rational"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d41702bd167c2df5520b384281bc111a4b5efcf7fbc4c9c222c815b07e0a6a6a"
 dependencies = [
  "autocfg",
  "num-integer",
@@ -891,8 +858,3 @@ checksum = "0d67cb4616d99b940db1d6bd28844ff97108b498a6ca850e5b6191a532063286"
 dependencies = [
  "vcell",
 ]
-
-[[patch.unused]]
-name = "smoltcp"
-version = "0.8.0"
-source = "git+https://github.com/smoltcp-rs/smoltcp?rev=1134eb#1134eb28d8c6886034f6ccad452101dc5e6d679c"
