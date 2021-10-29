@@ -1,9 +1,9 @@
 [package]
 categories = ["embedded", "no-std"]
 name = "mqtt-thermostat"
-description = "Test project for ai-thermostat components"
+description = "Thermostat MQTT"
 license = "GPL-3.0-only"
-authors = ["SingularitySurfer"]
+authors = ["SingularitySurfer, "]
 version = "0.0.0"
 keywords = ["thermostat", "laser", "physics"]
 repository = "https://git.m-labs.hk/M-Labs/thermostat"
@@ -15,28 +15,12 @@ default-target = "thumbv7em-none-eabihf"
 
 [dependencies]
 panic-halt = "0.2"
-# panic-semihosting = { version = "0.5", optional = true }
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 bare-metal = "1"
 cortex-m = "0.7"
 cortex-m-rt = { version = "0.6", features = ["device"] }
 cortex-m-log = { version = "0.6", features = ["log-integration"] }
-# stm32f4xx-hal = { version = "0.8.3", features = ["rt", "stm32f427"] }
-# stm32-eth = { version = "0.2", features = ["stm32f427", "smoltcp-phy"], git = "https://github.com/stm32-rs/stm32-eth.git" }
-# smoltcp = { version = "0.6.0", default-features = false, features = ["proto-ipv4", "socket-tcp", "log"] }
-# bit_field = "0.10"
-# byteorder = { version = "1", default-features = false }
-# nom = { version = "5", default-features = false }
-# num-traits = { version = "0.2", default-features = false, features = ["libm"] }
-# usb-device = "0.2"
-# usbd-serial = "0.1"
-# nb = "1"
-# uom = { version = "0.30", default-features = false, features = ["autoconvert", "si", "f64", "use_serde"] }
-# eeprom24x = "0.3"
-# serde = { version = "1.0", default-features = false, features = ["derive"] }
 heapless = { version = "0.7", features = ["serde"] }
-# serde-json-core = "0.1"
-# sfkv = "0.1"
 serde = { version = "1.0", features = ["derive"], default-features = false }
 shared-bus = {version = "0.2.2", features = ["cortex-m"] }
 serde-json-core = "0.4"
@@ -44,14 +28,12 @@ mcp23017 = "1.0"
 mutex-trait = "0.2"
 byteorder = { version = "1", default-features = false }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
-#idsp = { version = "0.1.0" }
-idsp = { path = "../idsp" }
 miniconf = { version = "0.1", optional = false }
-
 cortex-m-rtic = "0.5.7"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
-stm32-eth = { path = "../stm32-eth", features = ["smoltcp-phy", "stm32f427"] }
-# stm32-eth = { version = "0.2.0", features = ["stm32f427"] }
+stm32-eth = { git = "https://github.com/quartiq/stm32-eth.git", branch = "thermostat_deps", features = ["smoltcp-phy", "stm32f427"]}
+# stm32-eth = { version = "0.2.0", features = ["smoltcp-phy", "stm32f427"] }
+stm32f4xx-hal = {version = "0.8.3", features= ["rt"], optional = true}
 
 # rtt-target bump
 [dependencies.rtt-logger]
@@ -65,6 +47,10 @@ rev = "5baf55f"
 [dependencies.minimq]
 git = "https://github.com/quartiq/minimq.git"
 rev = "93813e3"
+
+[dependencies.idsp]
+git = "https://github.com/quartiq/idsp.git"
+rev = "6ed2bb8"
 
 [profile.release]
 codegen-units = 1
