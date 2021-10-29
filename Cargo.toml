@@ -46,6 +46,7 @@ byteorder = { version = "1", default-features = false }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 #idsp = { version = "0.1.0" }
 idsp = { path = "../idsp" }
+miniconf = { version = "0.1", optional = false }
 
 cortex-m-rtic = "0.5.7"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
@@ -61,25 +62,9 @@ rev = "70b0eb5"
 git = "https://github.com/quartiq/smoltcp-nal.git"
 rev = "5baf55f"
 
-[dependencies.miniconf]
-miniconf = { version = "0.1", optional = false }
-
 [dependencies.minimq]
 git = "https://github.com/quartiq/minimq.git"
 rev = "93813e3"
-
-[patch.crates-io.smoltcp]
-git = "https://github.com/smoltcp-rs/smoltcp"
-# branch = "master"
-rev = "1134eb"
-
-# [patch.crates-io.stm32f4xx-hal]
-# git = "https://github.com/astro/stm32f4xx-hal.git"
-# branch = "flash"
-
-
-# [features]
-# semihosting = ["panic-semihosting", "cortex-m-log/semihosting"]
 
 [profile.release]
 codegen-units = 1
