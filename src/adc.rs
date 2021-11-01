@@ -119,7 +119,7 @@ impl Adc {
     /// Reset ADC.
     pub fn reset(&mut self) {
         let mut buf = [0xFFu8; 8];
-        // self.sync.set_low().unwrap();
+        self.sync.set_low().unwrap();
         let result = self.spi.transfer(&mut buf);
         self.sync.set_high().unwrap();
         match result {
