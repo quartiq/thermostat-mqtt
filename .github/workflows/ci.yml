@@ -32,10 +32,13 @@ jobs:
     strategy:
       matrix:
         toolchain: [stable]
-        target: thumbv7em-none-eabihf
-        override: true
     steps:
       - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: thumbv7em-none-eabihf
+          override: true
 
       - uses: actions-rs/cargo@v1
         with:
