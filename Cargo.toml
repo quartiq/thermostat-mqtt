@@ -1,6 +1,6 @@
 [package]
 categories = ["embedded", "no-std"]
-name = "mqtt-thermostat"
+name = "thermostat-mqtt"
 description = "Thermostat MQTT"
 license = "GPL-3.0-only"
 authors = ["SingularitySurfer, "]
