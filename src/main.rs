@@ -68,10 +68,10 @@ impl Default for Settings {
             dacs: [0.0, 0.0],
             engage_iir: [false, false],
             adcsettings: AdcFilterSettings {
-                odr: 0b10101,   // 10Hz output data rate
+                odr: 0b10001,   // 20Hz output data rate (10 per channel)
                 order: 0,       // Sinc5+Sinc1 filter
                 enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
-                enhfilten: 1,   // enable postfilter
+                enhfilten: 0,   // disable postfilter
             },
             max_v_tec: [1.0, 1.0],
             pidsettings: [

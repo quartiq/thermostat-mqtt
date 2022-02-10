@@ -430,35 +430,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mqtt-thermostat"
-version = "0.0.0"
-dependencies = [
- "bare-metal 1.0.0",
- "byteorder",
- "cortex-m 0.7.2",
- "cortex-m-log",
- "cortex-m-rt",
- "cortex-m-rtic",
- "heapless 0.7.3",
- "idsp",
- "log",
- "mcp23017",
- "miniconf 0.1.0",
- "minimq 0.2.0",
- "mutex-trait",
- "num-traits",
- "panic-halt",
- "rtt-logger",
- "rtt-target",
- "serde",
- "serde-json-core",
- "shared-bus",
- "smoltcp-nal",
- "stm32-eth",
- "stm32f4xx-hal",
-]
-
-[[package]]
 name = "mutex-trait"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -806,6 +777,35 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
+]
+
+[[package]]
+name = "thermostat-mqtt"
+version = "0.0.0"
+dependencies = [
+ "bare-metal 1.0.0",
+ "byteorder",
+ "cortex-m 0.7.2",
+ "cortex-m-log",
+ "cortex-m-rt",
+ "cortex-m-rtic",
+ "heapless 0.7.3",
+ "idsp",
+ "log",
+ "mcp23017",
+ "miniconf 0.1.0",
+ "minimq 0.2.0",
+ "mutex-trait",
+ "num-traits",
+ "panic-halt",
+ "rtt-logger",
+ "rtt-target",
+ "serde",
+ "serde-json-core",
+ "shared-bus",
+ "smoltcp-nal",
+ "stm32-eth",
+ "stm32f4xx-hal",
 ]
 
 [[package]]

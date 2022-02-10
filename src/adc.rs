@@ -27,7 +27,7 @@ pub const SPI_CLOCK: MegaHertz = MegaHertz(2);
 
 // ADC Register Adresses
 #[allow(unused)]
-enum AdcReg {
+pub enum AdcReg {
     ID = 0x7,
     ADCMODE = 0x1,
     IFMODE = 0x2,
@@ -101,6 +101,7 @@ impl Adc {
             spi,
             sync: pins.sync,
         };
+
         adc.reset();
 
         info!("ADC ID: {:#X}", adc.read_reg(AdcReg::ID, 2));
@@ -117,7 +118,7 @@ impl Adc {
     }
 
     /// Reset ADC.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         let mut buf = [0xFFu8; 8];
         self.sync.set_low().unwrap();
         let result = self.spi.transfer(&mut buf);
@@ -130,6 +131,7 @@ impl Adc {
                 info!("ADC reset succeeded")
             }
         };
+        cortex_m::asm::delay(20000); // minimum waiting time in clock cycles ADJUST FOR OTHER SYSTEMS
     }
 
     /// Read a ADC register of size in bytes.
@@ -217,11 +219,11 @@ impl Adc {
             // External Reference
         );
 
-        // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(AdcReg::FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter.
+        self.write_reg(AdcReg::FILTCON0, 2, 0b110 << 8 | 0b10110);
 
-        // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter.
+        self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 0b10110);
     }
 
     /// Set both ADC channel filter config to the same settings.
