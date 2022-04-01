@@ -47,11 +47,11 @@ async def get_tele(telemetry_queue):
 def main():
     """ Main program entry point. """
     parser = argparse.ArgumentParser(description='record thermostat-mqtt data')
-    parser.add_argument('--broker', '-b', type=str, default='mqtt',
+    parser.add_argument('--broker', '-b', type=str, default='10.42.0.1',
                         help='The MQTT broker to use to communicate with Stabilizer')
-    parser.add_argument('--prefix', '-p', type=str, required=True,
+    parser.add_argument('--prefix', '-p', type=str, default='dt/sinara/thermostat-mqtt/80-1f-12-63-84-1a',
                         help='The Stabilizer device prefix to use for communication. E.g. '
-                        'dt/sinara/dual-iir/00-11-22-33-44-55')
+                        'dt/sinara/thermostat-mqtt/80-1f-12-63-84-1a')
     parser.add_argument('--channel', '-c', type=int, choices=[0, 1], default=0,
                         help='The filter channel to configure.')
     parser.add_argument('--telemetry_rate', type=int, default=1,
@@ -76,22 +76,29 @@ def main():
     async def record():
         interface = await Miniconf.create(args.prefix, args.broker)
 
-        await interface.command('telemetry_period', 0.1, retain=False)
-        await interface.command('adcsettings/odr', 17, retain=False)    # 10Hz sample rate with 2 ch
+        await interface.command('telemetry_period', 1, retain=False)
+        # await interface.command('adcsettings/odr', 17, retain=False)    # 10Hz sample rate with 2 ch
 
-        # fig = plt.figure()
-        # ax = fig.add_subplot(1, 1, 1)
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
         # plt.show()
+        plt.ion()
 
         f = open('adcvals.csv', 'w')
         writer = csv.writer(f)
         data = []
+        temp = []
         for i in range(MAXLEN):
             data.append(await get_tele(telemetry_queue))
             writer.writerow([data[i][0], data[i][1]])
+            temp.append(data[i][0])
             print(f'temp: {data[i][0]}, curr: {data[i][1]}')
-            # ax.clear()
-            # ax.plot(temp)
+            ax.clear()
+            ax.plot(temp)
+            plt.grid(True)
+            fig.canvas.draw()
+            plt.pause(0.0001)
+            fig.canvas.flush_events()
 
         f.close()
         telemetry_task.cancel()
